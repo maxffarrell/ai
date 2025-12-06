@@ -5,10 +5,10 @@ import {
   tool,
 } from "ai";
 import { experimental_createMCPClient as createMCPClient } from "./node_modules/@ai-sdk/mcp/dist/index.mjs";
-import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import { writeFileSync } from "node:fs";
 import { generateReport } from "./lib/report.ts";
+import { getModelProvider, loadEnvConfig } from "./lib/providers.ts";
 
 const mcp_client = await createMCPClient({
   transport: {
@@ -17,8 +17,12 @@ const mcp_client = await createMCPClient({
   },
 });
 
+// Load environment configuration and get model provider
+const envConfig = loadEnvConfig();
+const model = getModelProvider(envConfig);
+
 const svelte_agent = new Agent({
-  model: anthropic("claude-haiku-4-5"),
+  model,
 
   stopWhen: hasToolCall("ResultWrite"),
   tools: {

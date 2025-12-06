@@ -18,6 +18,38 @@ bun run generate-report.ts
 bun tsc --noEmit
 ```
 
+## Environment Variables
+
+### MODEL Configuration
+
+The `MODEL` environment variable determines which AI provider to use:
+
+**Anthropic Direct API:**
+```bash
+MODEL=anthropic/claude-haiku-4-5
+MODEL=anthropic/claude-sonnet-4
+```
+
+**OpenRouter (300+ models):**
+```bash
+MODEL=openrouter/anthropic/claude-sonnet-4
+MODEL=openrouter/google/gemini-pro
+MODEL=openrouter/meta-llama/llama-3.1-405b-instruct
+```
+
+### Required API Keys
+
+- `ANTHROPIC_API_KEY`: Required when using `anthropic/*` models
+- `OPENROUTER_API_KEY`: Required when using `openrouter/*` models (get at https://openrouter.ai/keys)
+
+### Provider Routing
+
+The benchmark tool automatically routes to the correct provider based on the `MODEL` prefix:
+- `anthropic/*` → Direct Anthropic API
+- `openrouter/*` → OpenRouter unified API
+
+This allows switching models and providers without any code changes.
+
 ## Architecture
 
 ### Core Components
@@ -25,10 +57,20 @@ bun tsc --noEmit
 - **`index.ts`**: Main benchmark entry point
 
   - Creates an AI agent using `Experimental_Agent` from Vercel AI SDK
+  - Uses smart provider routing based on `MODEL` environment variable
   - Configures MCP client to connect to Svelte MCP server at `https://mcp.svelte.dev/mcp`
   - Runs agent with a test prompt and captures results
   - Generates result.json with full agent execution trace
   - Automatically generates HTML report
+
+- **`lib/providers.ts`**: Smart provider routing
+
+  - Loads environment configuration from `MODEL`, `ANTHROPIC_API_KEY`, and `OPENROUTER_API_KEY`
+  - Routes to appropriate provider based on model prefix:
+    - `anthropic/*` → Direct Anthropic API
+    - `openrouter/*` → OpenRouter unified API
+  - Validates required API keys and provides clear error messages
+  - Returns configured language model instance
 
 - **`lib/report.ts`**: HTML report generation
 
@@ -46,7 +88,8 @@ bun tsc --noEmit
 ### Key Technologies
 
 - **Vercel AI SDK v5**: Agent framework with tool calling
-- **@ai-sdk/anthropic**: Anthropic provider (currently using `claude-haiku-4-5`)
+- **@ai-sdk/anthropic**: Anthropic provider for direct API access
+- **@openrouter/ai-sdk-provider**: OpenRouter provider for unified access to 300+ models
 - **@ai-sdk/mcp**: MCP client integration (with custom patch)
 - **Bun Runtime**: JavaScript runtime (not Node.js)
 
