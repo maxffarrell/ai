@@ -86,8 +86,8 @@ function generateHtml(data: ResultData): string {
   const stepsHtml = data.steps
     .map((step, index) => {
       const userMessage = step.request.body.messages.find((m) => m.role === "user");
-      const userPrompt = userMessage?.content[0]?.text || "No prompt";
-      const assistantResponse = step.content[0]?.text || "No response";
+      const userPrompt = (userMessage?.content[0]?.text || "No prompt").trim();
+      const assistantResponse = (step.content[0]?.text || "No response").trim();
       const timestamp = formatTimestamp(step.response.timestamp);
 
       return `
