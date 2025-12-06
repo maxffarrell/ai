@@ -44,6 +44,7 @@ interface Step {
 
 interface ResultData {
   steps: Step[];
+  resultWriteContent?: string | null;
 }
 
 /**
@@ -85,7 +86,9 @@ function formatTimestamp(timestamp: string): string {
 function generateHtml(data: ResultData): string {
   const stepsHtml = data.steps
     .map((step, index) => {
-      const userMessage = step.request.body.messages.find((m) => m.role === "user");
+      const userMessage = step.request.body.messages.find(
+        (m) => m.role === "user"
+      );
       const userPrompt = (userMessage?.content[0]?.text || "No prompt").trim();
       const assistantResponse = (step.content[0]?.text || "No response").trim();
       const timestamp = formatTimestamp(step.response.timestamp);
@@ -138,12 +141,30 @@ function generateHtml(data: ResultData): string {
 
           <div class="section">
             <h3>Assistant Response</h3>
-            <div class="content assistant-content">${escapeHtml(assistantResponse)}</div>
+            <div class="content assistant-content">${escapeHtml(
+              assistantResponse
+            )}</div>
           </div>
         </div>
       `;
     })
     .join("\n");
+
+  const resultWriteHtml = data.resultWriteContent
+    ? `
+    <div class="step result-write">
+      <div class="step-header">
+        <h2>ResultWrite Output</h2>
+      </div>
+      <div class="section">
+        <h3>Generated Content</h3>
+        <div class="content result-content">${escapeHtml(
+          data.resultWriteContent
+        )}</div>
+      </div>
+    </div>
+    `
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -288,6 +309,17 @@ function generateHtml(data: ResultData): string {
       white-space: pre-wrap;
     }
 
+    .result-content {
+      background-color: #fffbeb;
+      border-left: 3px solid #f59e0b;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+
+    .result-write .step-header h2 {
+      color: #f59e0b;
+    }
+
     @media (max-width: 768px) {
       body {
         padding: 0.75rem;
@@ -309,6 +341,7 @@ function generateHtml(data: ResultData): string {
   <div class="container">
     <h1>AI SDK Benchmark Results</h1>
     ${stepsHtml}
+    ${resultWriteHtml}
   </div>
 </body>
 </html>`;
