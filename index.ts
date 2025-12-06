@@ -1,5 +1,6 @@
-import { Experimental_Agent as Agent, stepCountIs } from "ai";
+import { Experimental_Agent as Agent, stepCountIs, tool } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
+import { z } from "zod";
 import { writeFileSync } from "node:fs";
 import { generateReport } from "./lib/report.ts";
 
@@ -16,10 +17,23 @@ const svelte_agent = new Agent({
   model: anthropic("claude-haiku-4-5"),
   // tools: await mcp_client.tools(),
   stopWhen: stepCountIs(5),
+  tools: {
+    ResultWrite: tool({
+      description: "Write content to a result file",
+      inputSchema: z.object({
+        content: z.string().describe("The content to write to the result file"),
+      }),
+      execute: async ({ content }) => {
+        console.log("[ResultWrite called]", content);
+        return { success: true };
+      },
+    }),
+  },
 });
 
 const result = await svelte_agent.generate({
-  prompt: "Can you build a counter component in svelte?",
+  prompt:
+    "Can you build a counter component in svelte? Use the ResultWrite tool to write the result to a file when you are done.",
 });
 
 writeFileSync("result.json", JSON.stringify(result, null, 2));
