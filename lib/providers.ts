@@ -1,10 +1,12 @@
 import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
 
 interface ProviderConfig {
   modelString: string;
   anthropicApiKey?: string;
+  openaiApiKey?: string;
   openrouterApiKey?: string;
 }
 
@@ -15,7 +17,7 @@ interface ProviderConfig {
  * @throws Error if required API key is missing or model format is invalid
  */
 export function getModelProvider(config: ProviderConfig): LanguageModel {
-  const { modelString, anthropicApiKey, openrouterApiKey } = config;
+  const { modelString, anthropicApiKey, openaiApiKey, openrouterApiKey } = config;
 
   // Validate model string format
   if (!modelString || typeof modelString !== "string") {
@@ -36,6 +38,18 @@ export function getModelProvider(config: ProviderConfig): LanguageModel {
     return anthropic(modelName);
   }
 
+  // Route to OpenAI provider
+  if (modelString.startsWith("openai/")) {
+    if (!openaiApiKey) {
+      throw new Error("OPENAI_API_KEY is required for OpenAI models");
+    }
+
+    // Extract model name (e.g., "openai/gpt-5" -> "gpt-5")
+    const modelName = modelString.replace("openai/", "");
+    // The OpenAI SDK reads the API key from process.env.OPENAI_API_KEY automatically
+    return openai(modelName);
+  }
+
   // Route to OpenRouter provider
   if (modelString.startsWith("openrouter/")) {
     if (!openrouterApiKey) {
@@ -54,7 +68,7 @@ export function getModelProvider(config: ProviderConfig): LanguageModel {
 
   // Invalid format
   throw new Error(
-    `Invalid MODEL format: "${modelString}". Must start with "anthropic/" or "openrouter/"`
+    `Invalid MODEL format: "${modelString}". Must start with "anthropic/", "openai/", or "openrouter/"`
   );
 }
 
@@ -65,18 +79,20 @@ export function getModelProvider(config: ProviderConfig): LanguageModel {
 export function loadEnvConfig(): ProviderConfig {
   const modelString = process.env.MODEL;
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+  const openaiApiKey = process.env.OPENAI_API_KEY;
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
 
   // Model is required
   if (!modelString) {
     throw new Error(
-      "MODEL environment variable is required. Format: 'anthropic/model-name' or 'openrouter/provider/model-name'"
+      "MODEL environment variable is required. Format: 'anthropic/model-name', 'openai/model-name', or 'openrouter/provider/model-name'"
     );
   }
 
   return {
     modelString,
     anthropicApiKey,
+    openaiApiKey,
     openrouterApiKey,
   };
 }

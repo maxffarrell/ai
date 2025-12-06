@@ -30,6 +30,13 @@ MODEL=anthropic/claude-haiku-4-5
 MODEL=anthropic/claude-sonnet-4
 ```
 
+**OpenAI Direct API:**
+```bash
+MODEL=openai/gpt-5
+MODEL=openai/gpt-5-mini
+MODEL=openai/gpt-4o
+```
+
 **OpenRouter (300+ models):**
 ```bash
 MODEL=openrouter/anthropic/claude-sonnet-4
@@ -40,12 +47,14 @@ MODEL=openrouter/meta-llama/llama-3.1-405b-instruct
 ### Required API Keys
 
 - `ANTHROPIC_API_KEY`: Required when using `anthropic/*` models
+- `OPENAI_API_KEY`: Required when using `openai/*` models (get at https://platform.openai.com/api-keys)
 - `OPENROUTER_API_KEY`: Required when using `openrouter/*` models (get at https://openrouter.ai/keys)
 
 ### Provider Routing
 
 The benchmark tool automatically routes to the correct provider based on the `MODEL` prefix:
 - `anthropic/*` → Direct Anthropic API
+- `openai/*` → Direct OpenAI API
 - `openrouter/*` → OpenRouter unified API
 
 This allows switching models and providers without any code changes.
@@ -65,9 +74,10 @@ This allows switching models and providers without any code changes.
 
 - **`lib/providers.ts`**: Smart provider routing
 
-  - Loads environment configuration from `MODEL`, `ANTHROPIC_API_KEY`, and `OPENROUTER_API_KEY`
+  - Loads environment configuration from `MODEL`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `OPENROUTER_API_KEY`
   - Routes to appropriate provider based on model prefix:
     - `anthropic/*` → Direct Anthropic API
+    - `openai/*` → Direct OpenAI API
     - `openrouter/*` → OpenRouter unified API
   - Validates required API keys and provides clear error messages
   - Returns configured language model instance
@@ -89,6 +99,7 @@ This allows switching models and providers without any code changes.
 
 - **Vercel AI SDK v5**: Agent framework with tool calling
 - **@ai-sdk/anthropic**: Anthropic provider for direct API access
+- **@ai-sdk/openai**: OpenAI provider for direct API access
 - **@openrouter/ai-sdk-provider**: OpenRouter provider for unified access to 300+ models
 - **@ai-sdk/mcp**: MCP client integration (with custom patch)
 - **Bun Runtime**: JavaScript runtime (not Node.js)
