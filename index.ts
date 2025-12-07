@@ -260,7 +260,7 @@ async function main() {
         ? "PASSED"
         : "FAILED"
       : "SKIPPED";
-    console.log( ${status} ${result.testName}: ${statusText}`);
+    console.log(`${status} ${result.testName}: ${statusText}`);
   }
 
   console.log("─".repeat(50));
