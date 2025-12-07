@@ -11,8 +11,11 @@ bun install
 # Run the main benchmark
 bun run index.ts
 
-# Generate HTML report from existing result.json
+# Generate HTML report from most recent result
 bun run generate-report.ts
+
+# Generate HTML report from specific result file
+bun run generate-report.ts results/result-2024-12-07-14-30-45.json
 
 # Run TypeScript type checking
 bun tsc --noEmit
@@ -69,8 +72,10 @@ This allows switching models and providers without any code changes.
   - Uses smart provider routing based on `MODEL` environment variable
   - Configures MCP client to connect to Svelte MCP server at `https://mcp.svelte.dev/mcp`
   - Runs agent with a test prompt and captures results
-  - Generates result.json with full agent execution trace
-  - Automatically generates HTML report
+  - Generates timestamped result files in `results/` directory:
+    - `result-YYYY-MM-DD-HH-MM-SS.json` - Full agent execution trace
+    - `result-YYYY-MM-DD-HH-MM-SS.html` - HTML visualization report
+  - Automatically opens HTML report in browser
 
 - **`lib/providers.ts`**: Smart provider routing
 
@@ -84,7 +89,7 @@ This allows switching models and providers without any code changes.
 
 - **`lib/report.ts`**: HTML report generation
 
-  - Parses result.json containing agent execution steps
+  - Parses result JSON files containing agent execution steps
   - Renders detailed HTML visualization with:
     - User prompts and assistant responses
     - Tool calls and their inputs/outputs
@@ -93,7 +98,9 @@ This allows switching models and providers without any code changes.
   - Auto-opens report in default browser using `Bun.spawn(["open", ...])`
 
 - **`generate-report.ts`**: Standalone report generator
-  - Utility to regenerate HTML reports from existing result.json files
+  - Regenerates HTML reports from existing result JSON files
+  - Can specify a specific result file or automatically uses the most recent one
+  - Usage: `bun run generate-report.ts [path/to/result.json]`
 
 ### Key Technologies
 
@@ -118,8 +125,21 @@ The project uses `@ai-sdk/mcp` with a custom patch applied via `patch-package`:
 2. Agent iterates through steps, calling tools as needed
 3. Each step is tracked with full request/response details
 4. Agent stops when `ResultWrite` tool is called
-5. Results written to `result.json` in root directory
-6. HTML report generated in `results/result.html`
+5. Results written to `results/result-YYYY-MM-DD-HH-MM-SS.json`
+6. HTML report generated at `results/result-YYYY-MM-DD-HH-MM-SS.html`
+7. Report automatically opens in default browser
+
+### Output Files
+
+All results are saved in the `results/` directory with timestamped filenames:
+
+- **JSON files**: `result-2024-12-07-14-30-45.json` - Complete execution trace with all agent steps, tool calls, and metadata
+- **HTML files**: `result-2024-12-07-14-30-45.html` - Interactive visualization of the benchmark run
+
+This naming convention allows you to:
+- Run multiple benchmarks without overwriting previous results
+- Easily identify when each benchmark was run
+- Compare results across different runs
 
 ## TypeScript Configuration
 
@@ -138,3 +158,4 @@ The project uses `@ai-sdk/mcp` with a custom patch applied via `patch-package`:
 - Agent stops execution when the `ResultWrite` tool is called (configured via `stopWhen` option)
 - HTML reports include collapsible tool input sections for better readability
 - Token usage includes cached token counts when available
+- All result files are saved with timestamps to preserve historical benchmarks

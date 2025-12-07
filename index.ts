@@ -6,9 +6,27 @@ import {
 } from "ai";
 import { experimental_createMCPClient as createMCPClient } from "./node_modules/@ai-sdk/mcp/dist/index.mjs";
 import { z } from "zod";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { generateReport } from "./lib/report.ts";
 import { getModelProvider, loadEnvConfig } from "./lib/providers.ts";
+
+/**
+ * Generate a timestamped filename
+ * @param prefix - The prefix for the filename (e.g., "result")
+ * @param extension - The file extension (e.g., "json", "html")
+ * @returns Formatted filename like "result-2024-12-07-14-30-45.json"
+ */
+function getTimestampedFilename(prefix: string, extension: string): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+
+  return `${prefix}-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.${extension}`;
+}
 
 const mcp_client = await createMCPClient({
   transport: {
@@ -57,10 +75,25 @@ for (const step of result.steps) {
   if (resultWriteContent) break;
 }
 
+// Ensure results directory exists
+const resultsDir = "results";
+if (!existsSync(resultsDir)) {
+  mkdirSync(resultsDir, { recursive: true });
+}
+
+// Generate timestamped filenames
+const jsonFilename = getTimestampedFilename("result", "json");
+const htmlFilename = getTimestampedFilename("result", "html");
+const jsonPath = `${resultsDir}/${jsonFilename}`;
+const htmlPath = `${resultsDir}/${htmlFilename}`;
+
+// Save result JSON with timestamped filename
 writeFileSync(
-  "result.json",
+  jsonPath,
   JSON.stringify({ ...result, resultWriteContent }, null, 2)
 );
 
-// Generate HTML report
-await generateReport("result.json", "results/result.html");
+console.log(`✓ Results saved to ${jsonPath}`);
+
+// Generate HTML report with timestamped filename
+await generateReport(jsonPath, htmlPath);
