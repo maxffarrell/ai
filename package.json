@@ -6,7 +6,8 @@
   "scripts": {
     "postinstall": "patch-package",
     "update": "bun update --interactive",
-    "verify-tests": "bun run verify-references.ts"
+    "verify-tests": "bun run verify-references.ts",
+    "prettier": "prettier --write ."
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
