@@ -1,14 +1,23 @@
 import {
   Experimental_Agent as Agent,
   hasToolCall,
+  stepCountIs,
   tool,
 } from "ai";
 import { experimental_createMCPClient as createMCPClient } from "./node_modules/@ai-sdk/mcp/dist/index.mjs";
 import { z } from "zod";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { generateReport, type SingleTestResult, type MultiTestResultData } from "./lib/report.ts";
+import {
+  generateReport,
+  type SingleTestResult,
+  type MultiTestResultData,
+} from "./lib/report.ts";
 import { getModelProvider, loadEnvConfig } from "./lib/providers.ts";
-import { discoverTests, buildAgentPrompt, type TestDefinition } from "./lib/test-discovery.ts";
+import {
+  discoverTests,
+  buildAgentPrompt,
+  type TestDefinition,
+} from "./lib/test-discovery.ts";
 import {
   setupOutputsDirectory,
   cleanupOutputsDirectory,
@@ -37,10 +46,19 @@ function getTimestampedFilename(prefix: string, extension: string): string {
  */
 function extractResultWriteContent(steps: unknown[]): string | null {
   for (const step of steps) {
-    const s = step as { content?: Array<{ type: string; toolName?: string; input?: { content: string } }> };
+    const s = step as {
+      content?: Array<{
+        type: string;
+        toolName?: string;
+        input?: { content: string };
+      }>;
+    };
     if (s.content) {
       for (const content of s.content) {
-        if (content.type === "tool-call" && content.toolName === "ResultWrite") {
+        if (
+          content.type === "tool-call" &&
+          content.toolName === "ResultWrite"
+        ) {
           return content.input?.content ?? null;
         }
       }
@@ -54,9 +72,9 @@ function extractResultWriteContent(steps: unknown[]): string | null {
  */
 async function runSingleTest(
   test: TestDefinition,
-  agent: Agent,
+  agent: Agent<any>,
   testIndex: number,
-  totalTests: number
+  totalTests: number,
 ): Promise<SingleTestResult> {
   console.log(`\n[${testIndex + 1}/${totalTests}] Running test: ${test.name}`);
   console.log("─".repeat(50));
@@ -76,7 +94,7 @@ async function runSingleTest(
       return {
         testName: test.name,
         prompt: test.prompt,
-        steps: result.steps as SingleTestResult["steps"],
+        steps: result.steps as unknown as SingleTestResult["steps"],
         resultWriteContent: null,
         verification: null,
       };
@@ -89,9 +107,13 @@ async function runSingleTest(
     const verification = await runTestVerification(test, resultWriteContent);
 
     if (verification.passed) {
-      console.log(`  ✓ All tests passed (${verification.numPassed}/${verification.numTests})`);
+      console.log(
+        `  ✓ All tests passed (${verification.numPassed}/${verification.numTests})`,
+      );
     } else {
-      console.log(`  ✗ Tests failed (${verification.numFailed}/${verification.numTests} failed)`);
+      console.log(
+        `  ✗ Tests failed (${verification.numFailed}/${verification.numTests} failed)`,
+      );
       if (verification.failedTests) {
         for (const ft of verification.failedTests) {
           console.log(`    - ${ft.fullName}`);
@@ -105,7 +127,7 @@ async function runSingleTest(
     return {
       testName: test.name,
       prompt: test.prompt,
-      steps: result.steps as SingleTestResult["steps"],
+      steps: result.steps as unknown as SingleTestResult["steps"],
       resultWriteContent,
       verification,
     };
@@ -147,7 +169,9 @@ async function main() {
   // Discover all tests
   console.log("\n📁 Discovering tests...");
   const tests = discoverTests();
-  console.log(`Found ${tests.length} test(s): ${tests.map((t) => t.name).join(", ")}`);
+  console.log(
+    `Found ${tests.length} test(s): ${tests.map((t) => t.name).join(", ")}`,
+  );
 
   if (tests.length === 0) {
     console.error("No tests found in tests/ directory");
@@ -174,7 +198,8 @@ async function main() {
   // Build tools object with conditional MCP tools
   const tools = {
     ResultWrite: tool({
-      description: "Write your final Svelte component code. Call this when you have completed implementing the component.",
+      description:
+        "Write your final Svelte component code. Call this when you have completed implementing the component.",
       inputSchema: z.object({
         content: z.string().describe("The complete Svelte component code"),
       }),
@@ -191,7 +216,7 @@ async function main() {
   // Create the agent
   const svelte_agent = new Agent({
     model,
-    stopWhen: hasToolCall("ResultWrite"),
+    stopWhen: [hasToolCall("ResultWrite"), stepCountIs(10)],
     tools,
   });
 
@@ -217,7 +242,9 @@ async function main() {
   console.log("═".repeat(50));
 
   const passed = testResults.filter((r) => r.verification?.passed).length;
-  const failed = testResults.filter((r) => r.verification && !r.verification.passed).length;
+  const failed = testResults.filter(
+    (r) => r.verification && !r.verification.passed,
+  ).length;
   const skipped = testResults.filter((r) => !r.verification).length;
 
   for (const result of testResults) {
@@ -235,7 +262,9 @@ async function main() {
   }
 
   console.log("─".repeat(50));
-  console.log(`Total: ${passed} passed, ${failed} failed, ${skipped} skipped (${(totalDuration / 1000).toFixed(1)}s)`);
+  console.log(
+    `Total: ${passed} passed, ${failed} failed, ${skipped} skipped (${(totalDuration / 1000).toFixed(1)}s)`,
+  );
 
   // Ensure results directory exists
   const resultsDir = "results";

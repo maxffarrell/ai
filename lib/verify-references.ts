@@ -178,7 +178,7 @@ export async function runTest(testDef: TestDefinition): Promise<TestResult> {
               if (parent.name) {
                 ancestorTitles.unshift(parent.name);
               }
-              parent = "parent" in parent ? (parent as { parent?: unknown }).parent : undefined;
+              parent = ("parent" in parent ? (parent as { parent?: unknown }).parent : undefined) as typeof parent;
             }
 
             const fullName =
