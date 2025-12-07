@@ -69,6 +69,7 @@ interface Step {
 interface Metadata {
   mcpEnabled: boolean;
   mcpServerUrl: string | null;
+  mcpTransportType?: string | null;
   timestamp: string;
   model: string;
 }

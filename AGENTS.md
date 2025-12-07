@@ -55,24 +55,46 @@ MODEL=openrouter/meta-llama/llama-3.1-405b-instruct
 
 ### MCP Server Configuration
 
-The `MCP_SERVER_URL` environment variable controls MCP (Model Context Protocol) integration:
+The `MCP_SERVER_URL` environment variable controls MCP (Model Context Protocol) integration. The tool automatically detects whether to use HTTP or StdIO transport based on the value format.
+
+**HTTP MCP Servers (Remote):**
 
 ```bash
 # Enable MCP with Svelte server (default for this benchmark)
 MCP_SERVER_URL=https://mcp.svelte.dev/mcp
 
+# Use a different HTTP MCP server
+MCP_SERVER_URL=https://your-mcp-server.com/mcp
+```
+
+**StdIO MCP Servers (Local):**
+
+For local MCP servers, simply provide the command string (any non-HTTP value):
+
+```bash
+# Use the default Svelte MCP server via npx
+MCP_SERVER_URL=npx -y @sveltejs/mcp
+
+# Use a custom local MCP server
+MCP_SERVER_URL=node path/to/your/mcp-server.js
+
+# Use with Bun runtime
+MCP_SERVER_URL=bun run src/mcp-server.ts --verbose
+```
+
+**Disable MCP:**
+
+```bash
 # Disable MCP integration (run without external tools)
 MCP_SERVER_URL=
-
-# Use a different MCP server
-MCP_SERVER_URL=https://your-mcp-server.com/mcp
 ```
 
 **Behavior:**
 
-- If `MCP_SERVER_URL` is set and not empty: MCP tools are injected into the agent
+- If `MCP_SERVER_URL` starts with `http://` or `https://`: Uses HTTP transport with that URL
+- If `MCP_SERVER_URL` is set but not an HTTP URL: Uses StdIO transport, treating the value as a command string
 - If `MCP_SERVER_URL` is empty or not set: Agent runs without MCP tools (only built-in tools)
-- MCP status is documented in the result JSON and HTML report with a badge
+- MCP transport type (HTTP or StdIO) and configuration are documented in the result JSON and HTML report
 
 ### Required API Keys
 

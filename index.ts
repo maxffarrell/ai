@@ -1,5 +1,6 @@
 import { Experimental_Agent as Agent, hasToolCall, stepCountIs } from "ai";
 import { experimental_createMCPClient as createMCPClient } from "./node_modules/@ai-sdk/mcp/dist/index.mjs";
+import { Experimental_StdioMCPTransport as StdioMCPTransport } from "./node_modules/@ai-sdk/mcp/dist/mcp-stdio/index.mjs";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import {
   generateReport,
@@ -34,6 +35,27 @@ function getTimestampedFilename(prefix: string, extension: string): string {
   const seconds = String(now.getSeconds()).padStart(2, "0");
 
   return `${prefix}-${year}-${month}-${day}-${hours}-${minutes}-${seconds}.${extension}`;
+}
+
+/**
+ * Parse a command string into command and args
+ * Example: "npx -y @sveltejs/mcp" -> { command: "npx", args: ["-y", "@sveltejs/mcp"] }
+ */
+function parseCommandString(commandString: string): {
+  command: string;
+  args: string[];
+} {
+  const parts = commandString.trim().split(/\s+/);
+  const command = parts[0] ?? "";
+  const args = parts.slice(1);
+  return { command, args };
+}
+
+/**
+ * Check if a string is an HTTP/HTTPS URL
+ */
+function isHttpUrl(str: string): boolean {
+  return str.startsWith("http://") || str.startsWith("https://");
 }
 
 /**
@@ -167,12 +189,16 @@ async function runSingleTest(
 
 // Main execution
 async function main() {
-  // Get MCP server URL from environment (optional)
+  // Get MCP server URL/command from environment (optional)
   const mcpServerUrl = process.env.MCP_SERVER_URL || "";
   const mcpEnabled = mcpServerUrl.trim() !== "";
 
   // Check if TestComponent tool is disabled
   const testComponentEnabled = process.env.DISABLE_TESTCOMPONENT_TOOL !== "1";
+
+  // Determine MCP transport type
+  const isHttpTransport = mcpEnabled && isHttpUrl(mcpServerUrl);
+  const mcpTransportType = isHttpTransport ? "HTTP" : "StdIO";
 
   console.log("╔════════════════════════════════════════════════════╗");
   console.log("║            SvelteBench 2.0 - Multi-Test            ║");
@@ -180,7 +206,12 @@ async function main() {
   console.log(`Model: ${process.env.MODEL}`);
   console.log(`MCP Integration: ${mcpEnabled ? "Enabled" : "Disabled"}`);
   if (mcpEnabled) {
-    console.log(`MCP Server URL: ${mcpServerUrl}`);
+    console.log(`MCP Transport: ${mcpTransportType}`);
+    if (isHttpTransport) {
+      console.log(`MCP Server URL: ${mcpServerUrl}`);
+    } else {
+      console.log(`MCP StdIO Command: ${mcpServerUrl}`);
+    }
   }
   console.log(
     `TestComponent Tool: ${testComponentEnabled ? "Enabled" : "Disabled"}`,
@@ -201,15 +232,28 @@ async function main() {
   // Set up outputs directory
   setupOutputsDirectory();
 
-  // Conditionally create MCP client if URL is provided
-  const mcpClient = mcpEnabled
-    ? await createMCPClient({
+  // Conditionally create MCP client based on transport type
+  let mcpClient: Awaited<ReturnType<typeof createMCPClient>> | null = null;
+  if (mcpEnabled) {
+    if (isHttpTransport) {
+      // HTTP transport
+      mcpClient = await createMCPClient({
         transport: {
           type: "http",
           url: mcpServerUrl,
         },
-      })
-    : null;
+      });
+    } else {
+      // StdIO transport - treat mcpServerUrl as command string
+      const { command, args } = parseCommandString(mcpServerUrl);
+      mcpClient = await createMCPClient({
+        transport: new StdioMCPTransport({
+          command,
+          args,
+        }),
+      });
+    }
+  }
 
   // Load environment configuration and get model provider
   const envConfig = loadEnvConfig();
@@ -286,6 +330,7 @@ async function main() {
     metadata: {
       mcpEnabled,
       mcpServerUrl: mcpEnabled ? mcpServerUrl : null,
+      mcpTransportType: mcpEnabled ? mcpTransportType : null,
       timestamp: new Date().toISOString(),
       model: envConfig.modelString,
     },
