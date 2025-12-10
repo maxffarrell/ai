@@ -77,29 +77,29 @@ function loadPricingData(): Record<string, unknown> {
 /**
  * Generate lookup candidates for a model string
  * Returns candidates in priority order (most specific first)
- * 
+ *
  * Vercel AI Gateway model IDs are in the format "provider/model-name"
  * LiteLLM pricing data stores them as "vercel_ai_gateway/provider/model-name"
- * 
+ *
  * Examples:
  * - "alibaba/qwen-3-14b" -> tries "vercel_ai_gateway/alibaba/qwen-3-14b", "alibaba/qwen-3-14b", "qwen-3-14b"
  * - "anthropic/claude-sonnet-4" -> tries "vercel_ai_gateway/anthropic/claude-sonnet-4", "anthropic/claude-sonnet-4", "claude-sonnet-4"
  */
 function generateLookupCandidates(modelString: string): string[] {
   const candidates: string[] = [];
-  
+
   // Primary: Try with vercel_ai_gateway prefix (how LiteLLM stores gateway models)
   candidates.push(`vercel_ai_gateway/${modelString}`);
-  
+
   // Secondary: Try the model string as-is
   candidates.push(modelString);
-  
+
   // Tertiary: If there's a provider prefix, try just the model name
   const slashIndex = modelString.indexOf("/");
   if (slashIndex !== -1) {
     const modelName = modelString.slice(slashIndex + 1);
     candidates.push(modelName);
-    
+
     // Also try nested paths (e.g., "openrouter/anthropic/claude" -> "anthropic/claude", "claude")
     const nestedSlashIndex = modelName.indexOf("/");
     if (nestedSlashIndex !== -1) {
@@ -159,28 +159,6 @@ export function lookupModelPricing(
   }
 
   return null;
-}
-
-/**
- * Look up pricing information for a model using an explicit key
- * Returns null if pricing is not found
- */
-export function lookupModelPricingByKey(
-  pricingKey: string,
-): ModelPricingLookup | null {
-  const data = loadPricingData();
-  const modelData = data[pricingKey] as Record<string, unknown> | undefined;
-
-  if (!modelData) {
-    return null;
-  }
-
-  const pricing = extractPricing(modelData);
-  if (!pricing) {
-    return null;
-  }
-
-  return { pricing, matchedKey: pricingKey };
 }
 
 /**

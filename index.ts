@@ -23,10 +23,10 @@ import {
 import { resultWriteTool, testComponentTool } from "./lib/tools/index.ts";
 import {
   lookupModelPricing,
-  lookupModelPricingByKey,
   getModelPricingDisplay,
   calculateCost,
   formatCost,
+  formatMTokCost,
   isPricingAvailable,
   type ModelPricing,
   type ModelPricingLookup,
@@ -40,16 +40,131 @@ import {
   text,
   select,
   confirm,
+  note,
 } from "@clack/prompts";
 import { gateway } from "ai";
 
-async function selectOptions() {
+interface PricingValidationResult {
+  enabled: boolean;
+  lookups: Map<string, ModelPricingLookup | null>;
+}
+
+interface SelectOptionsResult {
+  models: string[];
+  mcp: string | undefined;
+  testingTool: boolean;
+  pricing: PricingValidationResult;
+}
+
+/**
+ * Validate pricing for selected models and get user confirmation
+ */
+async function validateAndConfirmPricing(
+  models: string[],
+): Promise<PricingValidationResult> {
+  const lookups = new Map<string, ModelPricingLookup | null>();
+
+  // Check if pricing file exists
+  if (!isPricingAvailable()) {
+    note(
+      "Model pricing file not found.\nRun 'bun run update-model-pricing' to download it.",
+      "⚠️  Pricing Unavailable",
+    );
+
+    const proceed = await confirm({
+      message: "Continue without pricing?",
+      initialValue: true,
+    });
+
+    if (isCancel(proceed) || !proceed) {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    // Initialize all models with null pricing
+    for (const modelId of models) {
+      lookups.set(modelId, null);
+    }
+
+    return { enabled: false, lookups };
+  }
+
+  // Look up pricing for each model
+  for (const modelId of models) {
+    const lookup = lookupModelPricing(modelId);
+    lookups.set(modelId, lookup);
+  }
+
+  const modelsWithPricing = models.filter((m) => lookups.get(m) !== null);
+  const modelsWithoutPricing = models.filter((m) => lookups.get(m) === null);
+
+  if (modelsWithoutPricing.length === 0) {
+    // All models have pricing - show details and let user choose
+    const pricingLines = models.map((modelId) => {
+      const lookup = lookups.get(modelId)!;
+      const display = getModelPricingDisplay(lookup.pricing);
+      return `${modelId}\n  → ${lookup.matchedKey}\n  → ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out`;
+    });
+
+    note(pricingLines.join("\n\n"), "💰 Pricing Found");
+
+    const usePricing = await confirm({
+      message: "Enable cost calculation?",
+      initialValue: true,
+    });
+
+    if (isCancel(usePricing)) {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    return { enabled: usePricing, lookups };
+  } else {
+    // Some or all models don't have pricing
+    const lines: string[] = [];
+
+    if (modelsWithoutPricing.length > 0) {
+      lines.push("No pricing found for:");
+      for (const modelId of modelsWithoutPricing) {
+        lines.push(`  ✗ ${modelId}`);
+      }
+    }
+
+    if (modelsWithPricing.length > 0) {
+      lines.push("");
+      lines.push("Pricing available for:");
+      for (const modelId of modelsWithPricing) {
+        const lookup = lookups.get(modelId)!;
+        lines.push(`  ✓ ${modelId} → ${lookup.matchedKey}`);
+      }
+    }
+
+    lines.push("");
+    lines.push("Cost calculation will be disabled.");
+
+    note(lines.join("\n"), "⚠️  Pricing Incomplete");
+
+    const proceed = await confirm({
+      message: "Continue without pricing?",
+      initialValue: true,
+    });
+
+    if (isCancel(proceed) || !proceed) {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    return { enabled: false, lookups };
+  }
+}
+
+async function selectOptions(): Promise<SelectOptionsResult> {
   intro("🚀 Svelte AI Bench");
 
   const available_models = await gateway.getAvailableModels();
 
   const models = await multiselect({
-    message: "Select a model to benchmark",
+    message: "Select model(s) to benchmark",
     options: [{ value: "custom", label: "Custom" }].concat(
       available_models.models.reduce<Array<{ value: string; label: string }>>(
         (arr, model) => {
@@ -78,6 +193,11 @@ async function selectOptions() {
     }
     models.push(custom_model);
   }
+
+  const selectedModels = models.filter((model) => model !== "custom");
+
+  // Validate pricing for selected models
+  const pricing = await validateAndConfirmPricing(selectedModels);
 
   const mcp_integration = await select({
     message: "Which MCP integration to use?",
@@ -135,9 +255,10 @@ async function selectOptions() {
   }
 
   return {
-    models: models.filter((model) => model !== "custom"),
+    models: selectedModels,
     mcp,
     testingTool,
+    pricing,
   };
 }
 
@@ -238,71 +359,6 @@ function calculateTotalCost(
     outputTokens: totalOutputTokens,
     cachedInputTokens: totalCachedInputTokens,
   };
-}
-
-/**
- * Resolve pricing lookup for a model
- * Returns the pricing lookup result or null if disabled
- * Throws an error (exits process) if pricing cannot be found and is not disabled
- */
-function resolvePricingLookup(modelString: string): ModelPricingLookup | null {
-  const costDisabled = process.env.MODEL_COST_DISABLED === "true";
-  const explicitCostName = process.env.MODEL_COST_NAME;
-
-  // If cost calculation is explicitly disabled, return null
-  if (costDisabled) {
-    return null;
-  }
-
-  // Check if pricing data file exists
-  if (!isPricingAvailable()) {
-    console.error(
-      `\n✗ Model pricing file not found. Run 'bun run update-model-pricing' to download it.`,
-    );
-    console.error(
-      `  Or set MODEL_COST_DISABLED=true to skip cost calculation.\n`,
-    );
-    process.exit(1);
-  }
-
-  // If explicit cost name is provided, use that
-  if (explicitCostName) {
-    const lookup = lookupModelPricingByKey(explicitCostName);
-    if (!lookup) {
-      console.error(
-        `\n✗ Could not find pricing for MODEL_COST_NAME="${explicitCostName}" in model-pricing.json`,
-      );
-      console.error(
-        `  Check that the key exists in data/model-pricing.json.\n`,
-      );
-      process.exit(1);
-    }
-    return lookup;
-  }
-
-  // Try automatic lookup
-  const lookup = lookupModelPricing(modelString);
-  if (!lookup) {
-    console.error(
-      `\n✗ Could not find pricing for model "${modelString}" in model-pricing.json`,
-    );
-    console.error(`\n  Options:`);
-    console.error(
-      `    1. Set MODEL_COST_NAME=<key> to explicitly specify the pricing key`,
-    );
-    console.error(
-      `       Example: MODEL_COST_NAME=vercel_ai_gateway/anthropic/claude-sonnet-4`,
-    );
-    console.error(
-      `    2. Set MODEL_COST_DISABLED=true to skip cost calculation`,
-    );
-    console.error(
-      `\n  Browse data/model-pricing.json to find the correct key for your model.\n`,
-    );
-    process.exit(1);
-  }
-
-  return lookup;
 }
 
 /**
@@ -444,7 +500,8 @@ async function runSingleTest(
 
 // Main execution
 async function main() {
-  const { models, mcp, testingTool } = await selectOptions();
+  const { models, mcp, testingTool, pricing } = await selectOptions();
+
   // Get MCP server URL/command from environment (optional)
   const mcpServerUrl = mcp;
   const mcpEnabled = !!mcp;
@@ -456,46 +513,55 @@ async function main() {
   const isHttpTransport = mcpServerUrl && isHttpUrl(mcpServerUrl);
   const mcpTransportType = isHttpTransport ? "HTTP" : "StdIO";
 
-  const costDisabled = process.env.MODEL_COST_DISABLED === "true";
-
-  console.log("╔════════════════════════════════════════════════════╗");
+  // Print configuration header
+  console.log("\n╔════════════════════════════════════════════════════╗");
   console.log("║            SvelteBench 2.0 - Multi-Test            ║");
   console.log("╚════════════════════════════════════════════════════╝");
-  console.log(`Model(s): ${models.join(", ")}`);
-  if (costDisabled) {
-    console.log(`Pricing: Disabled (MODEL_COST_DISABLED=true)`);
-  }
-  console.log(`MCP Integration: ${mcpEnabled ? "Enabled" : "Disabled"}`);
-  if (mcpEnabled) {
-    console.log(`MCP Transport: ${mcpTransportType}`);
-    if (isHttpTransport) {
-      console.log(`MCP Server URL: ${mcpServerUrl}`);
+
+  // Print models with pricing info
+  console.log("\n📋 Models:");
+  for (const modelId of models) {
+    const lookup = pricing.lookups.get(modelId);
+    if (pricing.enabled && lookup) {
+      const display = getModelPricingDisplay(lookup.pricing);
+      console.log(`   ${modelId}`);
+      console.log(
+        `      💰 ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out`,
+      );
     } else {
-      console.log(`MCP StdIO Command: ${mcpServerUrl}`);
+      console.log(`   ${modelId}`);
     }
   }
+
+  // Print pricing status
+  console.log(`\n💰 Pricing: ${pricing.enabled ? "Enabled" : "Disabled"}`);
+
+  // Print MCP config
+  console.log(`🔌 MCP Integration: ${mcpEnabled ? "Enabled" : "Disabled"}`);
+  if (mcpEnabled) {
+    console.log(`   Transport: ${mcpTransportType}`);
+    if (isHttpTransport) {
+      console.log(`   URL: ${mcpServerUrl}`);
+    } else {
+      console.log(`   Command: ${mcpServerUrl}`);
+    }
+  }
+
+  // Print tool config
   console.log(
-    `TestComponent Tool: ${testComponentEnabled ? "Enabled" : "Disabled"}`,
+    `🧪 TestComponent Tool: ${testComponentEnabled ? "Enabled" : "Disabled"}`,
   );
 
   // Discover all tests
   console.log("\n📁 Discovering tests...");
   const tests = discoverTests();
   console.log(
-    `Found ${tests.length} test(s): ${tests.map((t) => t.name).join(", ")}`,
+    `   Found ${tests.length} test(s): ${tests.map((t) => t.name).join(", ")}`,
   );
 
   if (tests.length === 0) {
     console.error("No tests found in tests/ directory");
     process.exit(1);
-  }
-
-  // Pre-validate pricing for all models before starting any benchmarks
-  // This ensures we fail fast if any model's pricing is missing
-  const pricingLookups = new Map<string, ModelPricingLookup | null>();
-  for (const modelId of models) {
-    const pricingLookup = resolvePricingLookup(modelId);
-    pricingLookups.set(modelId, pricingLookup);
   }
 
   // Set up outputs directory
@@ -532,9 +598,14 @@ async function main() {
     console.log("═".repeat(50));
 
     // Get pre-validated pricing for this model
-    const pricingLookup = pricingLookups.get(modelId) ?? null;
+    const pricingLookup =
+      pricing.enabled ? (pricing.lookups.get(modelId) ?? null) : null;
+
     if (pricingLookup) {
-      console.log(`💰 Pricing mapped: ${pricingLookup.matchedKey}`);
+      const display = getModelPricingDisplay(pricingLookup.pricing);
+      console.log(
+        `💰 Pricing: ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out`,
+      );
     }
 
     // Get the model from gateway
