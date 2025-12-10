@@ -14,11 +14,9 @@ bun install
 
 Configure your API keys in `.env`:
 
-```bash
-cp .env.example .env
-```
-
-Then add the necessary API key use the `vercel env pull`
+1. Install Vercel CLI if you haven't already
+2. Run `bun run vercel:link` and link the benchmark to a project that has AI Gateway enabled
+3. Run the benchmark with "bun run dev"
 
 ### Required API Keys
 
