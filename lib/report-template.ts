@@ -553,7 +553,7 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
   <script>
     function toggleTheme() {
       const html = document.documentElement;
-      const current = html.dataset.theme || 'light';
+      const current = html.dataset.theme || 'dark';
       const next = current === 'light' ? 'dark' : 'light';
       html.dataset.theme = next;
       localStorage.setItem('theme', next);
