@@ -169,17 +169,17 @@ describe("calculateCost", () => {
       expect(result.inputTokens).toBe(1000);
       expect(result.outputTokens).toBe(500);
       expect(result.cachedInputTokens).toBe(0);
-      expect(result.inputCost).toBeCloseTo(0.003); // 1000 * $3/MTok
+      expect(result.inputCost).toBe(0.003); // 1000 * $3/MTok
       expect(result.outputCost).toBeCloseTo(0.0075); // 500 * $15/MTok
       expect(result.cacheReadCost).toBe(0);
-      expect(result.totalCost).toBeCloseTo(0.0105);
+      expect(result.totalCost).toBe(0.0105);
     });
 
     it("should default cachedInputTokens to 0", () => {
       const result = calculateCost(basePricing, 1000, 500);
 
       expect(result.cachedInputTokens).toBe(0);
-      expect(result.inputCost).toBeCloseTo(0.003);
+      expect(result.inputCost).toBe(0.003);
     });
   });
 
@@ -212,7 +212,7 @@ describe("calculateCost", () => {
       const result = calculateCost(pricingWithCache, 1000, 500, 1000);
 
       expect(result.inputCost).toBe(0);
-      expect(result.cacheReadCost).toBeCloseTo(0.0003); // 1000 * $0.30/MTok
+      expect(result.cacheReadCost).toBe(0.0003); // 1000 * $0.30/MTok
     });
   });
 
@@ -229,9 +229,9 @@ describe("calculateCost", () => {
     it("should handle large token counts", () => {
       const result = calculateCost(basePricing, 1_000_000, 500_000, 0);
 
-      expect(result.inputCost).toBeCloseTo(3); // 1M * $3/MTok
-      expect(result.outputCost).toBeCloseTo(7.5); // 500K * $15/MTok
-      expect(result.totalCost).toBeCloseTo(10.5);
+      expect(result.inputCost).toBe(3); // 1M * $3/MTok
+      expect(result.outputCost).toBe(7.5); // 500K * $15/MTok
+      expect(result.totalCost).toBe(10.5);
     });
 
     it("should handle pricing with zero costs", () => {
@@ -283,7 +283,7 @@ describe("formatMTokCost", () => {
 
   it("should format per-MTok costs >= $0.01 with 2 decimal places", () => {
     expect(formatMTokCost(0.01)).toBe("$0.01");
-    expect(formatMTokCost(0.30)).toBe("$0.30");
+    expect(formatMTokCost(0.3)).toBe("$0.30");
     expect(formatMTokCost(3)).toBe("$3.00");
     expect(formatMTokCost(15)).toBe("$15.00");
   });
@@ -314,7 +314,7 @@ describe("getModelPricingDisplay", () => {
 
     expect(display.inputCostPerMTok).toBe(3);
     expect(display.outputCostPerMTok).toBe(15);
-    expect(display.cacheReadCostPerMTok).toBeCloseTo(0.3);
+    expect(display.cacheReadCostPerMTok).toBe(0.3);
   });
 
   it("should handle zero costs", () => {
