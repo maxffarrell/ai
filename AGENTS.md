@@ -21,7 +21,7 @@ bun run generate-report.ts
 bun run generate-report.ts results/result-2024-12-07-14-30-45.json
 
 # Run unit tests for lib modules
-bun run test:self
+bun test
 
 # Run TypeScript type checking
 bun tsc --noEmit
