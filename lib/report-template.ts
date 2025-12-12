@@ -581,7 +581,7 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
       }
     }
 
-    document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
+    document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark';
   </script>
 </body>
 </html>`;
