@@ -49,22 +49,10 @@ import {
 } from "@clack/prompts";
 import { gateway } from "ai";
 
-interface PricingValidationResult {
-  enabled: boolean;
-  lookups: Map<string, ModelPricingLookup | null>;
-}
-
-interface SelectOptionsResult {
-  models: string[];
-  mcp: string | undefined;
-  testingTool: boolean;
-  pricing: PricingValidationResult;
-}
-
 async function validateAndConfirmPricing(
   models: string[],
   pricingMap: Map<string, ModelPricingLookup | null>,
-): Promise<PricingValidationResult> {
+) {
   const lookups = new Map<string, ModelPricingLookup | null>();
 
   for (const modelId of models) {
@@ -136,7 +124,7 @@ async function validateAndConfirmPricing(
   }
 }
 
-async function selectOptions(): Promise<SelectOptionsResult> {
+async function selectOptions() {
   intro("🚀 Svelte AI Bench");
 
   const available_models = await gateway.getAvailableModels();
