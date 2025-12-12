@@ -5,7 +5,7 @@ import {
   calculateTotalCost,
   simulateCacheSavings,
 } from "./utils.ts";
-import type { ModelPricing } from "./pricing.ts";
+import { extractPricingFromGatewayModel } from "./pricing.ts";
 import type { SingleTestResult } from "./report.ts";
 
 describe("sanitizeModelName", () => {
@@ -105,11 +105,11 @@ describe("getTimestampedFilename", () => {
 });
 
 describe("calculateTotalCost", () => {
-  const pricing: ModelPricing = {
+  const pricing = {
     inputCostPerToken: 1.0 / 1_000_000,
     outputCostPerToken: 2.0 / 1_000_000,
     cacheReadInputTokenCost: 0.1 / 1_000_000,
-  };
+  } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
 
   it("calculates zero cost for empty results", () => {
     const tests: SingleTestResult[] = [];
@@ -198,10 +198,10 @@ describe("simulateCacheSavings - growing prefix model", () => {
   // Default pricing: input=$1/MTok, output=$2/MTok
   // Default cache read: 10% of input = $0.10/MTok
   // Default cache write: 125% of input = $1.25/MTok
-  const basicPricing: ModelPricing = {
+  const basicPricing = {
     inputCostPerToken: 1.0 / 1_000_000,
     outputCostPerToken: 2.0 / 1_000_000,
-  };
+  } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
 
   it("returns zeros for empty tests array", () => {
     const tests: SingleTestResult[] = [];
@@ -414,12 +414,12 @@ describe("simulateCacheSavings - growing prefix model", () => {
   });
 
   it("uses custom cache pricing when provided", () => {
-    const customPricing: ModelPricing = {
+    const customPricing = {
       inputCostPerToken: 1.0 / 1_000_000,
       outputCostPerToken: 2.0 / 1_000_000,
       cacheReadInputTokenCost: 0.05 / 1_000_000, // 5% instead of default 10%
       cacheCreationInputTokenCost: 1.5 / 1_000_000, // 150% instead of default 125%
-    };
+    } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
 
     const tests: SingleTestResult[] = [
       {
