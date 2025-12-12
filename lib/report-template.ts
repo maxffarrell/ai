@@ -257,6 +257,16 @@ function renderPricingSection(data: MultiTestResultData) {
       ? `<span class="pricing-key" title="Key matched in model-pricing.json">${escapeHtml(pricingKey)}</span>`
       : "";
 
+    const cacheReadText =
+      pricing.cacheReadCostPerMTok !== undefined
+        ? `<span class="rate-separator">·</span><span class="rate-value">${formatMTokCost(pricing.cacheReadCostPerMTok)}/MTok cache read</span>`
+        : "";
+
+    const cacheWriteText =
+      pricing.cacheCreationCostPerMTok !== undefined
+        ? `<span class="rate-separator">·</span><span class="rate-value">${formatMTokCost(pricing.cacheCreationCostPerMTok)}/MTok cache write</span>`
+        : "";
+
     pricingInfoHtml = `
       <div class="pricing-rates">
         <span class="rate-label">Model Pricing:</span>
@@ -264,7 +274,8 @@ function renderPricingSection(data: MultiTestResultData) {
         <span class="rate-value">${formatMTokCost(pricing.inputCostPerMTok)}/MTok in</span>
         <span class="rate-separator">·</span>
         <span class="rate-value">${formatMTokCost(pricing.outputCostPerMTok)}/MTok out</span>
-        ${pricing.cacheReadCostPerMTok !== undefined ? `<span class="rate-separator">·</span><span class="rate-value">${formatMTokCost(pricing.cacheReadCostPerMTok)}/MTok cached</span>` : ""}
+        ${cacheReadText}
+        ${cacheWriteText}
       </div>
     `;
   }
@@ -278,9 +289,9 @@ function renderPricingSection(data: MultiTestResultData) {
       data.metadata.cacheSimulation &&
       pricing?.cacheReadCostPerMTok !== undefined
         ? `
-        <div class="cost-row">
-          <span class="cost-label cached">Total cost with prompt cache (estimate):</span>
-          <span class="cost-tokens">${data.metadata.cacheSimulation.cacheableTokens.toLocaleString()} cacheable × ${data.metadata.cacheSimulation.cacheHits} hits</span>
+        <div class="cost-row simulated">
+          <span class="cost-label">Estimated cost with prompt cache:</span>
+          <span class="cost-tokens">${data.metadata.cacheSimulation.cacheableTokens.toLocaleString()} base + ${data.metadata.cacheSimulation.cacheHits.toLocaleString()} hits + ${data.metadata.cacheSimulation.cacheWriteTokens.toLocaleString()} writes</span>
           <span class="cost-value">${formatCost(data.metadata.cacheSimulation.simulatedCostWithCache)}</span>
         </div>
         `
@@ -302,7 +313,7 @@ function renderPricingSection(data: MultiTestResultData) {
           totalCost.cachedInputTokens > 0
             ? `
         <div class="cost-row cached">
-          <span class="cost-label">Cached tokens:</span>
+          <span class="cost-label">Cached tokens (read):</span>
           <span class="cost-tokens">${totalCost.cachedInputTokens.toLocaleString()} ⚡</span>
           <span class="cost-value">${formatCost(totalCost.cacheReadCost)}</span>
         </div>
@@ -399,7 +410,7 @@ function getPricingStyles() {
 
     .cost-row {
       display: grid;
-      grid-template-columns: 120px 1fr auto;
+      grid-template-columns: 200px 1fr auto;
       gap: 8px;
       align-items: center;
       font-size: 13px;
@@ -407,6 +418,14 @@ function getPricingStyles() {
 
     .cost-row.cached {
       color: var(--text-muted);
+    }
+
+    .cost-row.simulated {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+      color: var(--text-muted);
+      font-style: italic;
     }
 
     .cost-row.total {
@@ -418,10 +437,6 @@ function getPricingStyles() {
 
     .cost-label {
       color: var(--text-muted);
-    }
-
-    .cost-label.cached {
-      font-size: 10px;
     }
 
     .cost-row.total .cost-label {
@@ -443,6 +458,10 @@ function getPricingStyles() {
     .cost-row.total .cost-value {
       color: var(--success);
       font-size: 15px;
+    }
+
+    .cost-row.simulated .cost-value {
+      color: var(--mcp-enabled);
     }
   `;
 }

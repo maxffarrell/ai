@@ -25,8 +25,9 @@ import {
   getModelPricingDisplay,
   formatCost,
   formatMTokCost,
+  type ModelPricingLookup,
+  type GatewayModel,
 } from "./lib/pricing.ts";
-import type { GatewayLanguageModelEntry } from "@ai-sdk/gateway";
 import type { LanguageModel } from "ai";
 import {
   intro,
@@ -42,12 +43,9 @@ import { gateway } from "ai";
 
 async function validateAndConfirmPricing(
   models: string[],
-  pricingMap: ReturnType<typeof buildPricingMap>,
+  pricingMap: Map<string, ModelPricingLookup | null>,
 ) {
-  const lookups = new Map<
-    string,
-    ReturnType<typeof lookupPricingFromMap>
-  >();
+  const lookups = new Map<string, ModelPricingLookup | null>();
 
   for (const modelId of models) {
     const lookup = lookupPricingFromMap(modelId, pricingMap);
@@ -61,11 +59,15 @@ async function validateAndConfirmPricing(
     const pricingLines = models.map((modelId) => {
       const lookup = lookups.get(modelId)!;
       const display = getModelPricingDisplay(lookup.pricing);
-      const cacheText =
+      const cacheReadText =
         display.cacheReadCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cached`
+          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
           : "";
-      return `${modelId}\n  → ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheText}`;
+      const cacheWriteText =
+        display.cacheCreationCostPerMTok !== undefined
+          ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
+          : "";
+      return `${modelId}\n  → ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText}`;
     });
 
     note(pricingLines.join("\n\n"), "💰 Pricing Found");
@@ -97,12 +99,16 @@ async function validateAndConfirmPricing(
       for (const modelId of modelsWithPricing) {
         const lookup = lookups.get(modelId)!;
         const display = getModelPricingDisplay(lookup.pricing);
-        const cacheText =
+        const cacheReadText =
           display.cacheReadCostPerMTok !== undefined
-            ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cached`
+            ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
+            : "";
+        const cacheWriteText =
+          display.cacheCreationCostPerMTok !== undefined
+            ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
             : "";
         lines.push(
-          `  ✓ ${modelId} (${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheText})`,
+          `  ✓ ${modelId} (${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText})`,
         );
       }
     }
@@ -131,7 +137,8 @@ async function selectOptions() {
 
   const available_models = await gateway.getAvailableModels();
 
-  const pricingMap = buildPricingMap(available_models.models);
+  const gatewayModels = available_models.models as GatewayModel[];
+  const pricingMap = buildPricingMap(gatewayModels);
 
   const models = await multiselect({
     message: "Select model(s) to benchmark",
@@ -389,13 +396,17 @@ async function main() {
     const lookup = pricing.lookups.get(modelId);
     if (pricing.enabled && lookup) {
       const display = getModelPricingDisplay(lookup.pricing);
-      const cacheText =
+      const cacheReadText =
         display.cacheReadCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cached`
+          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
+          : "";
+      const cacheWriteText =
+        display.cacheCreationCostPerMTok !== undefined
+          ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
           : "";
       console.log(`   ${modelId}`);
       console.log(
-        `      💰 ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheText}`,
+        `      💰 ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText}`,
       );
     } else {
       console.log(`   ${modelId}`);
@@ -464,12 +475,16 @@ async function main() {
 
     if (pricingLookup) {
       const display = getModelPricingDisplay(pricingLookup.pricing);
-      const cacheText =
+      const cacheReadText =
         display.cacheReadCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cached`
+          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
+          : "";
+      const cacheWriteText =
+        display.cacheCreationCostPerMTok !== undefined
+          ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
           : "";
       console.log(
-        `💰 Pricing: ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheText}`,
+        `💰 Pricing: ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText}`,
       );
     }
 
@@ -535,6 +550,7 @@ async function main() {
         inputCostPerMTok: pricingDisplay.inputCostPerMTok,
         outputCostPerMTok: pricingDisplay.outputCostPerMTok,
         cacheReadCostPerMTok: pricingDisplay.cacheReadCostPerMTok,
+        cacheCreationCostPerMTok: pricingDisplay.cacheCreationCostPerMTok,
       };
 
       console.log("\n💰 Cost Summary");
@@ -547,7 +563,7 @@ async function main() {
       );
       if (totalCost.cachedInputTokens > 0) {
         console.log(
-          `Cached tokens: ${totalCost.cachedInputTokens.toLocaleString()} (${formatCost(totalCost.cacheReadCost)})`,
+          `Cached tokens (read): ${totalCost.cachedInputTokens.toLocaleString()} (${formatCost(totalCost.cacheReadCost)})`,
         );
       }
       console.log(`Total cost: ${formatCost(totalCost.totalCost)}`);
@@ -557,18 +573,28 @@ async function main() {
         testResults,
         pricingLookup.pricing,
       );
-      if (cacheSimulation.cacheHits > 0) {
-        console.log("\n📊 Cache Simulation (if enabled):");
+      if (cacheSimulation.cacheHits > 0 || cacheSimulation.cacheableTokens > 0) {
+        console.log("\n📊 Cache Simulation (estimated with prompt caching):");
         console.log("─".repeat(50));
         console.log(
-          `Cacheable tokens: ${cacheSimulation.cacheableTokens.toLocaleString()} (from initial prompts)`,
+          `Cacheable tokens (step 1): ${cacheSimulation.cacheableTokens.toLocaleString()}`,
         );
         console.log(
-          `Cache hits: ${cacheSimulation.cacheHits.toLocaleString()} (subsequent steps)`,
+          `Cache hits (subsequent steps): ${cacheSimulation.cacheHits.toLocaleString()}`,
         );
         console.log(
-          `Simulated cost with cache: ${formatCost(cacheSimulation.simulatedCostWithCache)}`,
+          `Cache writes (new tokens): ${cacheSimulation.cacheWriteTokens.toLocaleString()}`,
         );
+        console.log(
+          `Estimated cost with cache: ${formatCost(cacheSimulation.simulatedCostWithCache)}`,
+        );
+        const savings = totalCost.totalCost - cacheSimulation.simulatedCostWithCache;
+        const savingsPercent = (savings / totalCost.totalCost) * 100;
+        if (savings > 0) {
+          console.log(
+            `Potential savings: ${formatCost(savings)} (${savingsPercent.toFixed(1)}%)`,
+          );
+        }
       }
     }
 

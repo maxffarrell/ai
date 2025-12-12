@@ -5,7 +5,7 @@ import {
   calculateTotalCost,
   simulateCacheSavings,
 } from "./utils.ts";
-import { extractPricingFromGatewayModel } from "./pricing.ts";
+import type { ModelPricing } from "./pricing.ts";
 import type { SingleTestResult } from "./report.ts";
 
 describe("sanitizeModelName", () => {
@@ -105,11 +105,11 @@ describe("getTimestampedFilename", () => {
 });
 
 describe("calculateTotalCost", () => {
-  const pricing = {
+  const pricing: ModelPricing = {
     inputCostPerToken: 1.0 / 1_000_000,
     outputCostPerToken: 2.0 / 1_000_000,
     cacheReadInputTokenCost: 0.1 / 1_000_000,
-  } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
+  };
 
   it("calculates zero cost for empty results", () => {
     const tests: SingleTestResult[] = [];
@@ -119,6 +119,7 @@ describe("calculateTotalCost", () => {
       inputCost: 0,
       outputCost: 0,
       cacheReadCost: 0,
+      cacheCreationCost: 0,
       totalCost: 0,
       inputTokens: 0,
       outputTokens: 0,
@@ -184,6 +185,7 @@ describe("calculateTotalCost", () => {
       inputCost: 0.00057,
       outputCost: 0.0006,
       cacheReadCost: 0.000003,
+      cacheCreationCost: 0,
       totalCost: 0.001173,
       inputTokens: 600,
       outputTokens: 300,
@@ -192,11 +194,14 @@ describe("calculateTotalCost", () => {
   });
 });
 
-describe("simulateCacheSavings", () => {
-  const basicPricing = {
+describe("simulateCacheSavings - growing prefix model", () => {
+  // Default pricing: input=$1/MTok, output=$2/MTok
+  // Default cache read: 10% of input = $0.10/MTok
+  // Default cache write: 125% of input = $1.25/MTok
+  const basicPricing: ModelPricing = {
     inputCostPerToken: 1.0 / 1_000_000,
     outputCostPerToken: 2.0 / 1_000_000,
-  } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
+  };
 
   it("returns zeros for empty tests array", () => {
     const tests: SingleTestResult[] = [];
@@ -206,6 +211,7 @@ describe("simulateCacheSavings", () => {
       simulatedCostWithCache: 0,
       cacheableTokens: 0,
       cacheHits: 0,
+      cacheWriteTokens: 0,
     });
   });
 
@@ -230,22 +236,15 @@ describe("simulateCacheSavings", () => {
 
     const result = simulateCacheSavings(tests, basicPricing);
 
-    // With only 1 step, there are 0 cache hits
-    // Cacheable tokens = 1000
-    // Cache hits = 0
-    // Actual cost = (1000 * 1e-6) + (500 * 2e-6) = 0.001 + 0.001 = 0.002
-    // Cache write cost = 1000 * (1.25e-6 - 1e-6) = 1000 * 0.25e-6 = 0.00025
-    // Cache savings = 1000 * 0 * (1e-6 - 0.1e-6) = 0
-    // Simulated cost = 0.002 - 0 + 0.00025 = 0.00225
-    // Potential savings = 0.002 - 0.00225 = -0.00025 (negative savings)
-    // Savings percentage = -0.00025 / 0.002 * 100 = -12.5
-
+    // Step 1: 1000 input tokens at cache write rate (1.25/MTok) + 500 output at $2/MTok
+    // Simulated cost = 1000 * 1.25e-6 + 500 * 2e-6 = 0.00125 + 0.001 = 0.00225
     expect(result.cacheableTokens).toBe(1000);
     expect(result.cacheHits).toBe(0);
+    expect(result.cacheWriteTokens).toBe(1000);
     expect(result.simulatedCostWithCache).toBeCloseTo(0.00225, 6);
   });
 
-  it("calculates savings for single test with multiple steps", () => {
+  it("calculates savings for single test with multiple steps - growing prefix", () => {
     const tests: SingleTestResult[] = [
       {
         testName: "test1",
@@ -262,14 +261,14 @@ describe("simulateCacheSavings", () => {
           } as any,
           {
             usage: {
-              inputTokens: 1000,
+              inputTokens: 1500,
               outputTokens: 300,
               cachedInputTokens: 0,
             },
           } as any,
           {
             usage: {
-              inputTokens: 1000,
+              inputTokens: 2000,
               outputTokens: 400,
               cachedInputTokens: 0,
             },
@@ -280,23 +279,22 @@ describe("simulateCacheSavings", () => {
 
     const result = simulateCacheSavings(tests, basicPricing);
 
-    // Cacheable tokens = 1000 (from step 1)
-    // Cache hits = 2 (steps 2 and 3)
-    // Actual cost = (3000 * 1e-6) + (900 * 2e-6) = 0.003 + 0.0018 = 0.0048
-    // Cache read rate = 0.1 * 1e-6
-    // Cache write rate = 1.25 * 1e-6
-    // Cache savings = 1000 * 2 * (1e-6 - 0.1e-6) = 2000 * 0.9e-6 = 0.0018
-    // Cache write cost = 1000 * (1.25e-6 - 1e-6) = 1000 * 0.25e-6 = 0.00025
-    // Simulated cost = 0.0048 - 0.0018 + 0.00025 = 0.00325
-    // Potential savings = 0.0048 - 0.00325 = 0.00155
-    // Savings percentage = 0.00155 / 0.0048 * 100 = 32.291...
+    // Growing prefix model:
+    // Step 1: 1000 tokens → write all to cache
+    //   Cost: 1000 * 1.25e-6 + 200 * 2e-6 = 0.00125 + 0.0004 = 0.00165
+    // Step 2: 1500 tokens → 1000 cached (read), 500 new (write)
+    //   Cost: 1000 * 0.1e-6 + 500 * 1.25e-6 + 300 * 2e-6 = 0.0001 + 0.000625 + 0.0006 = 0.001325
+    // Step 3: 2000 tokens → 1500 cached (read), 500 new (write)
+    //   Cost: 1500 * 0.1e-6 + 500 * 1.25e-6 + 400 * 2e-6 = 0.00015 + 0.000625 + 0.0008 = 0.001575
+    // Total simulated: 0.00165 + 0.001325 + 0.001575 = 0.00455
 
-    expect(result.cacheableTokens).toBe(1000);
-    expect(result.cacheHits).toBe(2);
-    expect(result.simulatedCostWithCache).toBeCloseTo(0.00325, 6);
+    expect(result.cacheableTokens).toBe(1000); // Step 1 input
+    expect(result.cacheHits).toBe(1000 + 1500); // 1000 from step 2 + 1500 from step 3
+    expect(result.cacheWriteTokens).toBe(1000 + 500 + 500); // 1000 step1 + 500 step2 + 500 step3
+    expect(result.simulatedCostWithCache).toBeCloseTo(0.00455, 6);
   });
 
-  it("aggregates across multiple tests", () => {
+  it("aggregates across multiple tests with cache reset per test", () => {
     const tests: SingleTestResult[] = [
       {
         testName: "test1",
@@ -313,7 +311,7 @@ describe("simulateCacheSavings", () => {
           } as any,
           {
             usage: {
-              inputTokens: 500,
+              inputTokens: 800,
               outputTokens: 100,
               cachedInputTokens: 0,
             },
@@ -328,21 +326,21 @@ describe("simulateCacheSavings", () => {
         steps: [
           {
             usage: {
-              inputTokens: 800,
+              inputTokens: 600,
               outputTokens: 200,
               cachedInputTokens: 0,
             },
           } as any,
           {
             usage: {
-              inputTokens: 800,
+              inputTokens: 900,
               outputTokens: 200,
               cachedInputTokens: 0,
             },
           } as any,
           {
             usage: {
-              inputTokens: 800,
+              inputTokens: 1200,
               outputTokens: 200,
               cachedInputTokens: 0,
             },
@@ -353,16 +351,32 @@ describe("simulateCacheSavings", () => {
 
     const result = simulateCacheSavings(tests, basicPricing);
 
-    // Test 1: cacheable = 500, hits = 1
-    // Test 2: cacheable = 800, hits = 2
-    // Total cacheable = 1300, total hits = 3
-    expect(result.cacheableTokens).toBe(1300);
-    expect(result.cacheHits).toBe(3);
+    // Test 1:
+    //   Step 1: 500 write, 100 output
+    //   Step 2: 500 read, 300 write, 100 output
+    //   Cacheable: 500, Hits: 500, Writes: 500 + 300 = 800
+    //
+    // Test 2:
+    //   Step 1: 600 write, 200 output
+    //   Step 2: 600 read, 300 write, 200 output
+    //   Step 3: 900 read, 300 write, 200 output
+    //   Cacheable: 600, Hits: 600 + 900 = 1500, Writes: 600 + 300 + 300 = 1200
 
-    // Cache savings = 1300 * 3 * (1e-6 - 0.1e-6) = 3900 * 0.9e-6 = 0.00351
-    // Cache write cost = 1300 * 0.25e-6 = 0.000325
-    // Simulated cost = 0.0050 - 0.00351 + 0.000325 = 0.001815
-    expect(result.simulatedCostWithCache).toBeCloseTo(0.001815, 6);
+    // Total: cacheable = 500 + 600 = 1100, hits = 500 + 1500 = 2000, writes = 800 + 1200 = 2000
+
+    expect(result.cacheableTokens).toBe(1100);
+    expect(result.cacheHits).toBe(2000);
+    expect(result.cacheWriteTokens).toBe(2000);
+
+    // Calculate expected cost manually:
+    // Test 1 Step 1: 500 * 1.25e-6 + 100 * 2e-6 = 0.000625 + 0.0002 = 0.000825
+    // Test 1 Step 2: 500 * 0.1e-6 + 300 * 1.25e-6 + 100 * 2e-6 = 0.00005 + 0.000375 + 0.0002 = 0.000625
+    // Test 2 Step 1: 600 * 1.25e-6 + 200 * 2e-6 = 0.00075 + 0.0004 = 0.00115
+    // Test 2 Step 2: 600 * 0.1e-6 + 300 * 1.25e-6 + 200 * 2e-6 = 0.00006 + 0.000375 + 0.0004 = 0.000835
+    // Test 2 Step 3: 900 * 0.1e-6 + 300 * 1.25e-6 + 200 * 2e-6 = 0.00009 + 0.000375 + 0.0004 = 0.000865
+    // Total: 0.000825 + 0.000625 + 0.00115 + 0.000835 + 0.000865 = 0.0043
+
+    expect(result.simulatedCostWithCache).toBeCloseTo(0.0043, 6);
   });
 
   it("skips tests with empty steps array", () => {
@@ -396,15 +410,16 @@ describe("simulateCacheSavings", () => {
     // Only test2 should be counted
     expect(result.cacheableTokens).toBe(1000);
     expect(result.cacheHits).toBe(0);
+    expect(result.cacheWriteTokens).toBe(1000);
   });
 
   it("uses custom cache pricing when provided", () => {
-    const customPricing = {
+    const customPricing: ModelPricing = {
       inputCostPerToken: 1.0 / 1_000_000,
       outputCostPerToken: 2.0 / 1_000_000,
       cacheReadInputTokenCost: 0.05 / 1_000_000, // 5% instead of default 10%
       cacheCreationInputTokenCost: 1.5 / 1_000_000, // 150% instead of default 125%
-    } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
+    };
 
     const tests: SingleTestResult[] = [
       {
@@ -422,7 +437,7 @@ describe("simulateCacheSavings", () => {
           } as any,
           {
             usage: {
-              inputTokens: 1000,
+              inputTokens: 1500,
               outputTokens: 500,
               cachedInputTokens: 0,
             },
@@ -433,15 +448,53 @@ describe("simulateCacheSavings", () => {
 
     const result = simulateCacheSavings(tests, customPricing);
 
-    // Cacheable = 1000, hits = 1
-    // Actual cost = (2000 * 1e-6) + (1000 * 2e-6) = 0.002 + 0.002 = 0.004
-    // Cache read rate = 0.05e-6 (custom)
-    // Cache write rate = 1.5e-6 (custom)
-    // Cache savings = 1000 * 1 * (1e-6 - 0.05e-6) = 1000 * 0.95e-6 = 0.00095
-    // Cache write cost = 1000 * (1.5e-6 - 1e-6) = 1000 * 0.5e-6 = 0.0005
-    // Simulated cost = 0.004 - 0.00095 + 0.0005 = 0.00355
+    // Step 1: 1000 write at $1.50/MTok + 500 output at $2/MTok
+    //   = 1000 * 1.5e-6 + 500 * 2e-6 = 0.0015 + 0.001 = 0.0025
+    // Step 2: 1000 read at $0.05/MTok + 500 write at $1.50/MTok + 500 output at $2/MTok
+    //   = 1000 * 0.05e-6 + 500 * 1.5e-6 + 500 * 2e-6 = 0.00005 + 0.00075 + 0.001 = 0.0018
+    // Total: 0.0025 + 0.0018 = 0.0043
 
-    expect(result.simulatedCostWithCache).toBeCloseTo(0.00355, 6);
+    expect(result.cacheableTokens).toBe(1000);
+    expect(result.cacheHits).toBe(1000);
+    expect(result.cacheWriteTokens).toBe(1000 + 500);
+    expect(result.simulatedCostWithCache).toBeCloseTo(0.0043, 6);
+  });
+
+  it("handles input tokens decreasing between steps (edge case)", () => {
+    const tests: SingleTestResult[] = [
+      {
+        testName: "test1",
+        prompt: "p1",
+        resultWriteContent: null,
+        verification: {} as any,
+        steps: [
+          {
+            usage: {
+              inputTokens: 1000,
+              outputTokens: 100,
+              cachedInputTokens: 0,
+            },
+          } as any,
+          {
+            usage: {
+              inputTokens: 800, // Less than step 1 (unusual but possible)
+              outputTokens: 100,
+              cachedInputTokens: 0,
+            },
+          } as any,
+        ],
+      },
+    ];
+
+    const result = simulateCacheSavings(tests, basicPricing);
+
+    // Step 1: 1000 write
+    // Step 2: 1000 read (previous step), 0 new write (800 - 1000 = -200 → clamped to 0)
+    // This tests the Math.max(0, newPortion) behavior
+
+    expect(result.cacheableTokens).toBe(1000);
+    expect(result.cacheHits).toBe(1000); // Still reads full previous prefix
+    expect(result.cacheWriteTokens).toBe(1000); // Only step 1 writes
   });
 
   it("handles zero actual cost edge case", () => {
@@ -466,5 +519,61 @@ describe("simulateCacheSavings", () => {
     const result = simulateCacheSavings(tests, basicPricing);
 
     expect(result.simulatedCostWithCache).toBe(0);
+    expect(result.cacheableTokens).toBe(0);
+    expect(result.cacheHits).toBe(0);
+    expect(result.cacheWriteTokens).toBe(0);
+  });
+
+  it("compares favorably to actual cost for multi-step tests", () => {
+    const tests: SingleTestResult[] = [
+      {
+        testName: "test1",
+        prompt: "p1",
+        resultWriteContent: null,
+        verification: {} as any,
+        steps: [
+          {
+            usage: {
+              inputTokens: 1000,
+              outputTokens: 100,
+              cachedInputTokens: 0,
+            },
+          } as any,
+          {
+            usage: {
+              inputTokens: 1200,
+              outputTokens: 100,
+              cachedInputTokens: 0,
+            },
+          } as any,
+          {
+            usage: {
+              inputTokens: 1400,
+              outputTokens: 100,
+              cachedInputTokens: 0,
+            },
+          } as any,
+        ],
+      },
+    ];
+
+    const result = simulateCacheSavings(tests, basicPricing);
+
+    // Actual cost (no caching):
+    // Input: (1000 + 1200 + 1400) * 1e-6 = 3600 * 1e-6 = 0.0036
+    // Output: (100 + 100 + 100) * 2e-6 = 300 * 2e-6 = 0.0006
+    // Total actual: 0.0042
+
+    const actualCost = 0.0042;
+
+    // Simulated should be less than actual for multi-step scenarios
+    expect(result.simulatedCostWithCache).toBeLessThan(actualCost);
+
+    // Calculate savings
+    const savings = actualCost - result.simulatedCostWithCache;
+    const savingsPercent = (savings / actualCost) * 100;
+
+    // Should have meaningful savings (>10% for this scenario)
+    expect(savingsPercent).toBeGreaterThan(10);
   });
 });
