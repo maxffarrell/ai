@@ -179,9 +179,10 @@ export function getModelPricingDisplay(
   return {
     inputCostPerMTok: pricing.inputCostPerToken * 1_000_000,
     outputCostPerMTok: pricing.outputCostPerToken * 1_000_000,
-    cacheReadCostPerMTok: pricing.cacheReadInputTokenCost
-      ? pricing.cacheReadInputTokenCost * 1_000_000
-      : undefined,
+    cacheReadCostPerMTok:
+      pricing.cacheReadInputTokenCost !== undefined
+        ? pricing.cacheReadInputTokenCost * 1_000_000
+        : undefined,
   };
 }
 

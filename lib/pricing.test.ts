@@ -258,4 +258,18 @@ describe("getModelPricingDisplay", () => {
     expect(display.inputCostPerMTok).toBe(0);
     expect(display.outputCostPerMTok).toBe(0);
   });
+
+  it("should preserve explicit zero cost for cache read", () => {
+    const pricing: ModelPricing = {
+      inputCostPerToken: 0.000003,
+      outputCostPerToken: 0.000015,
+      cacheReadInputTokenCost: 0,
+    };
+
+    const display = getModelPricingDisplay(pricing);
+
+    expect(display.inputCostPerMTok).toBe(3);
+    expect(display.outputCostPerMTok).toBe(15);
+    expect(display.cacheReadCostPerMTok).toBe(0);
+  });
 });
