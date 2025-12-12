@@ -2,10 +2,7 @@ import { Experimental_Agent as Agent, hasToolCall, stepCountIs } from "ai";
 import { experimental_createMCPClient as createMCPClient } from "./node_modules/@ai-sdk/mcp/dist/index.mjs";
 import { Experimental_StdioMCPTransport as StdioMCPTransport } from "./node_modules/@ai-sdk/mcp/dist/mcp-stdio/index.mjs";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
-import {
-  generateReport,
-  type SingleTestResult,
-} from "./lib/report.ts";
+import { generateReport, type SingleTestResult } from "./lib/report.ts";
 import {
   getTimestampedFilename,
   isHttpUrl,

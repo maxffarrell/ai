@@ -98,9 +98,7 @@ function renderContentBlock(block: ContentBlock) {
   return "";
 }
 
-function renderVerificationResult(
-  verification: TestVerificationResult | null,
-) {
+function renderVerificationResult(verification: TestVerificationResult | null) {
   if (!verification) {
     return `<div class="verification-result skipped">
       <span class="verification-icon">⊘</span>

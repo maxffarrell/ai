@@ -46,9 +46,7 @@ export interface GatewayModel {
   modelType: string;
 }
 
-export function extractPricingFromGatewayModel(
-  model: GatewayModel,
-) {
+export function extractPricingFromGatewayModel(model: GatewayModel) {
   if (!model.pricing) {
     return null;
   }
@@ -86,9 +84,7 @@ export function extractPricingFromGatewayModel(
   return result;
 }
 
-export function buildPricingMap(
-  models: GatewayModel[],
-) {
+export function buildPricingMap(models: GatewayModel[]) {
   const map = new Map<string, ModelPricingLookup | null>();
 
   for (const model of models) {
@@ -113,9 +109,7 @@ export function lookupPricingFromMap(
   return pricingMap.get(modelId) ?? null;
 }
 
-export function getModelPricingDisplay(
-  pricing: ModelPricing,
-) {
+export function getModelPricingDisplay(pricing: ModelPricing) {
   return {
     inputCostPerMTok: pricing.inputCostPerToken * 1_000_000,
     outputCostPerMTok: pricing.outputCostPerToken * 1_000_000,
