@@ -55,16 +55,18 @@ export function extractPricingFromGatewayModel(
 
   const { pricing } = model;
 
-  const inputCost = pricing.input ? parseFloat(pricing.input) : 0;
-  const outputCost = pricing.output ? parseFloat(pricing.output) : 0;
+  const inputCost = pricing.input ? parseFloat(pricing.input) : NaN;
+  const outputCost = pricing.output ? parseFloat(pricing.output) : NaN;
 
-  if ((inputCost === 0 || isNaN(inputCost)) && (outputCost === 0 || isNaN(outputCost))) {
-    return null;
+  if (isNaN(inputCost) || isNaN(outputCost)) {
+    throw new Error(
+      `Invalid pricing for model ${model.id}: input and output pricing must be valid numbers.`,
+    );
   }
 
   const result: ModelPricing = {
-    inputCostPerToken: isNaN(inputCost) ? 0 : inputCost,
-    outputCostPerToken: isNaN(outputCost) ? 0 : outputCost,
+    inputCostPerToken: inputCost,
+    outputCostPerToken: outputCost,
   };
 
   if (pricing.cachedInputTokens) {

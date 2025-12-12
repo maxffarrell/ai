@@ -64,7 +64,7 @@ describe("extractPricingFromGatewayModel", () => {
     expect(pricing).toBeNull();
   });
 
-  it("should return null for model with empty pricing object", () => {
+  it("should throw error for model with empty pricing object", () => {
     const model: GatewayModel = {
       id: "local/model",
       name: "Local Model",
@@ -72,11 +72,12 @@ describe("extractPricingFromGatewayModel", () => {
       modelType: "language",
     };
 
-    const pricing = extractPricingFromGatewayModel(model);
-    expect(pricing).toBeNull();
+    expect(() => extractPricingFromGatewayModel(model)).toThrowError(
+      /Invalid pricing/,
+    );
   });
 
-  it("should handle invalid pricing values gracefully", () => {
+  it("should throw error for invalid pricing values", () => {
     const model: GatewayModel = {
       id: "test/model",
       name: "Test Model",
@@ -87,11 +88,9 @@ describe("extractPricingFromGatewayModel", () => {
       modelType: "language",
     };
 
-    const pricing = extractPricingFromGatewayModel(model);
-
-    expect(pricing).not.toBeNull();
-    expect(pricing!.inputCostPerToken).toBe(0);
-    expect(pricing!.outputCostPerToken).toBe(0.000015);
+    expect(() => extractPricingFromGatewayModel(model)).toThrowError(
+      /Invalid pricing/,
+    );
   });
 });
 
