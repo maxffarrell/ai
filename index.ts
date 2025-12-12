@@ -261,7 +261,7 @@ async function runSingleTest(
   console.log(`\n[${testIndex + 1}/${totalTests}] Running test: ${test.name}`);
   console.log("─".repeat(50));
 
-  const prompt = buildAgentPrompt(test);
+  const messages = buildAgentPrompt(test);
 
   try {
     const tools = {
@@ -314,7 +314,7 @@ async function runSingleTest(
     if (testComponentEnabled) {
       console.log("  📋 TestComponent tool is available");
     }
-    const result = await agent.generate({ prompt });
+    const result = await agent.generate({ messages });
 
     const resultWriteContent = extractResultWriteContent(result.steps);
 
