@@ -1,8 +1,8 @@
 import type { TestVerificationResult } from "./output-test-runner.ts";
 import type { MultiTestResultData, SingleTestResult } from "./report.ts";
 import { getReportStyles } from "./report-styles.ts";
+import { formatCost, formatMTokCost } from "./pricing.ts";
 
-// Type definitions for content blocks
 interface TextBlock {
   type: "text";
   text: string;
@@ -42,10 +42,7 @@ interface Step {
   [key: string]: unknown;
 }
 
-/**
- * Escape HTML special characters
- */
-function escapeHtml(text: string): string {
+function escapeHtml(text: string) {
   const map: Record<string, string> = {
     "&": "&amp;",
     "<": "&lt;",
@@ -60,10 +57,7 @@ function escapeHtml(text: string): string {
   return result;
 }
 
-/**
- * Format timestamp to readable date
- */
-function formatTimestamp(timestamp: string): string {
+function formatTimestamp(timestamp: string) {
   const date = new Date(timestamp);
   return date.toLocaleString("en-US", {
     year: "numeric",
@@ -75,18 +69,12 @@ function formatTimestamp(timestamp: string): string {
   });
 }
 
-/**
- * Get first N lines of code
- */
-function getFirstLines(code: string, numLines: number): string {
+function getFirstLines(code: string, numLines: number) {
   const lines = code.split("\n");
   return lines.slice(0, numLines).join("\n");
 }
 
-/**
- * Render a single content block based on its type
- */
-function renderContentBlock(block: ContentBlock): string {
+function renderContentBlock(block: ContentBlock) {
   if (block.type === "text") {
     return `<div class="text">${escapeHtml(block.text)}</div>`;
   } else if (block.type === "tool-call") {
@@ -110,12 +98,9 @@ function renderContentBlock(block: ContentBlock): string {
   return "";
 }
 
-/**
- * Render verification result section
- */
 function renderVerificationResult(
   verification: TestVerificationResult | null,
-): string {
+) {
   if (!verification) {
     return `<div class="verification-result skipped">
       <span class="verification-icon">⊘</span>
@@ -159,10 +144,7 @@ function renderVerificationResult(
   </div>`;
 }
 
-/**
- * Render steps for a single test
- */
-function renderSteps(steps: Step[]): string {
+function renderSteps(steps: Step[]) {
   return steps
     .map((step, index) => {
       const assistantContentHtml =
@@ -195,10 +177,7 @@ function renderSteps(steps: Step[]): string {
     .join("\n");
 }
 
-/**
- * Render a single test's section
- */
-function renderTestSection(test: SingleTestResult, index: number): string {
+function renderTestSection(test: SingleTestResult, index: number) {
   const totalTokens = test.steps.reduce(
     (sum, step) => sum + step.usage.totalTokens,
     0,
@@ -218,7 +197,6 @@ function renderTestSection(test: SingleTestResult, index: number): string {
   const stepsHtml = renderSteps(test.steps);
   const verificationHtml = renderVerificationResult(test.verification);
 
-  // Generate unique ID for this test's component code
   const componentId = `component-${test.testName.replace(/[^a-zA-Z0-9]/g, "-")}`;
 
   const resultWriteHtml = test.resultWriteContent
@@ -267,10 +245,194 @@ function renderTestSection(test: SingleTestResult, index: number): string {
   </details>`;
 }
 
-/**
- * Generate HTML report from multi-test result data
- */
-export function generateMultiTestHtml(data: MultiTestResultData): string {
+function renderPricingSection(data: MultiTestResultData) {
+  const { metadata } = data;
+  const { pricing, totalCost, pricingKey } = metadata;
+
+  if (!pricing && !totalCost) {
+    return "";
+  }
+
+  let pricingInfoHtml = "";
+  if (pricing) {
+    const pricingKeyDisplay = pricingKey
+      ? `<span class="pricing-key" title="Key matched in model-pricing.json">${escapeHtml(pricingKey)}</span>`
+      : "";
+
+    pricingInfoHtml = `
+      <div class="pricing-rates">
+        <span class="rate-label">Model Pricing:</span>
+        ${pricingKeyDisplay}
+        <span class="rate-value">${formatMTokCost(pricing.inputCostPerMTok)}/MTok in</span>
+        <span class="rate-separator">·</span>
+        <span class="rate-value">${formatMTokCost(pricing.outputCostPerMTok)}/MTok out</span>
+        ${pricing.cacheReadCostPerMTok !== undefined ? `<span class="rate-separator">·</span><span class="rate-value">${formatMTokCost(pricing.cacheReadCostPerMTok)}/MTok cached</span>` : ""}
+      </div>
+    `;
+  }
+
+  let costBreakdownHtml = "";
+  if (totalCost) {
+    const uncachedInputTokens =
+      totalCost.inputTokens - totalCost.cachedInputTokens;
+
+    costBreakdownHtml = `
+      <div class="cost-breakdown">
+        <div class="cost-row">
+          <span class="cost-label">Input tokens:</span>
+          <span class="cost-tokens">${uncachedInputTokens.toLocaleString()}</span>
+          <span class="cost-value">${formatCost(totalCost.inputCost)}</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-label">Output tokens:</span>
+          <span class="cost-tokens">${totalCost.outputTokens.toLocaleString()}</span>
+          <span class="cost-value">${formatCost(totalCost.outputCost)}</span>
+        </div>
+        ${
+          totalCost.cachedInputTokens > 0
+            ? `
+        <div class="cost-row cached">
+          <span class="cost-label">Cached tokens:</span>
+          <span class="cost-tokens">${totalCost.cachedInputTokens.toLocaleString()} ⚡</span>
+          <span class="cost-value">${formatCost(totalCost.cacheReadCost)}</span>
+        </div>
+        `
+            : ""
+        }
+        <div class="cost-row total">
+          <span class="cost-label">Total Cost:</span>
+          <span class="cost-tokens"></span>
+          <span class="cost-value">${formatCost(totalCost.totalCost)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="pricing-section">
+      <div class="pricing-header">
+        <span class="pricing-icon">💰</span>
+        <span class="pricing-title">Cost Summary</span>
+      </div>
+      ${pricingInfoHtml}
+      ${costBreakdownHtml}
+    </div>
+  `;
+}
+
+function getPricingStyles() {
+  return `
+    .pricing-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .pricing-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .pricing-icon {
+      font-size: 16px;
+    }
+
+    .pricing-title {
+      font-size: 14px;
+    }
+
+    .pricing-rates {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .rate-label {
+      font-weight: 500;
+    }
+
+    .pricing-key {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 11px;
+    }
+
+    .rate-value {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .rate-separator {
+      color: var(--border);
+    }
+
+    .cost-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .cost-row {
+      display: grid;
+      grid-template-columns: 120px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .cost-row.cached {
+      color: var(--text-muted);
+    }
+
+    .cost-row.total {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .cost-label {
+      color: var(--text-muted);
+    }
+
+    .cost-row.total .cost-label {
+      color: var(--text);
+    }
+
+    .cost-tokens {
+      font-family: 'JetBrains Mono', monospace;
+      text-align: right;
+    }
+
+    .cost-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      text-align: right;
+      min-width: 80px;
+    }
+
+    .cost-row.total .cost-value {
+      color: var(--success);
+      font-size: 15px;
+    }
+  `;
+}
+
+export function generateMultiTestHtml(data: MultiTestResultData) {
   const metadata = data.metadata;
   const totalTests = data.tests.length;
   const passedTests = data.tests.filter((t) => t.verification?.passed).length;
@@ -299,6 +461,10 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
   </div>`
     : "";
 
+  const costDisplay = metadata.totalCost
+    ? `<span class="cost-badge">${formatCost(metadata.totalCost.totalCost)}</span>`
+    : "";
+
   const overallStatus =
     failedTests === 0 && skippedTests === 0
       ? "all-passed"
@@ -310,7 +476,22 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
     .map((test, index) => renderTestSection(test, index))
     .join("\n");
 
-  const styles = getReportStyles();
+  const pricingHtml = renderPricingSection(data);
+
+  const styles =
+    getReportStyles() +
+    getPricingStyles() +
+    `
+    .cost-badge {
+      background: var(--success);
+      color: white;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+    }
+  `;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -324,7 +505,7 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
   <header>
     <div class="header-top">
       <div>
-        <h1>SvelteBench 2.0 ${mcpBadge}</h1>
+        <h1>SvelteBench 2.0 ${mcpBadge} ${costDisplay}</h1>
         <div class="meta">${escapeHtml(metadata.model)} · ${totalTests} tests · ${totalTokens.toLocaleString()} tokens · ${formatTimestamp(metadata.timestamp)}</div>
       </div>
       <button class="theme-toggle" onclick="toggleTheme()">◐</button>
@@ -338,12 +519,14 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
 
   ${mcpNotice}
 
+  ${pricingHtml}
+
   ${testsHtml}
 
   <script>
     function toggleTheme() {
       const html = document.documentElement;
-      const current = html.dataset.theme || 'light';
+      const current = html.dataset.theme || 'dark';
       const next = current === 'light' ? 'dark' : 'light';
       html.dataset.theme = next;
       localStorage.setItem('theme', next);
@@ -357,13 +540,11 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
       const collapseText = button.querySelector('.collapse-text');
       
       if (preview.style.display === 'none') {
-        // Show preview
         preview.style.display = 'block';
         full.style.display = 'none';
         expandText.style.display = 'inline';
         collapseText.style.display = 'none';
       } else {
-        // Show full
         preview.style.display = 'none';
         full.style.display = 'block';
         expandText.style.display = 'none';
@@ -371,7 +552,7 @@ export function generateMultiTestHtml(data: MultiTestResultData): string {
       }
     }
 
-    document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
+    document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark';
   </script>
 </body>
 </html>`;
