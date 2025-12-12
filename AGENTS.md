@@ -279,3 +279,7 @@ Run unit tests with: `bun run test:self`
 - MCP status is clearly indicated in both the JSON metadata and HTML report with a visual badge
 - Exit code is 0 if all tests pass, 1 if any tests fail
 - Pricing is fetched from Vercel AI Gateway model metadata at runtime
+
+## Important notes
+
+Always run `bun run tsc` and `bun test` before completing work to make sure the TypeScript types and tests work.
