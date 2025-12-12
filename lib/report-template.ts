@@ -279,7 +279,7 @@ function renderPricingSection(data: MultiTestResultData) {
       pricing?.cacheReadCostPerMTok !== undefined
         ? `
         <div class="cost-row">
-          <span class="cost-label">Total cost with prompt cache (estimate):</span>
+          <span class="cost-label cached">Total cost with prompt cache (estimate):</span>
           <span class="cost-tokens">${data.metadata.cacheSimulation.cacheableTokens.toLocaleString()} cacheable × ${data.metadata.cacheSimulation.cacheHits} hits</span>
           <span class="cost-value">${formatCost(data.metadata.cacheSimulation.simulatedCostWithCache)}</span>
         </div>
@@ -418,6 +418,10 @@ function getPricingStyles() {
 
     .cost-label {
       color: var(--text-muted);
+    }
+
+    .cost-label.cached {
+      font-size: 10px;
     }
 
     .cost-row.total .cost-label {
