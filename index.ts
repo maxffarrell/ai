@@ -573,17 +573,18 @@ async function main() {
         testResults,
         pricingLookup.pricing,
       );
-      if (cacheSimulation.cacheHits > 0 || cacheSimulation.cacheableTokens > 0) {
+      if (cacheSimulation.cacheHits > 0 || cacheSimulation.cacheWriteTokens > 0) {
         console.log("\n📊 Cache Simulation (estimated with prompt caching):");
         console.log("─".repeat(50));
+        const totalCacheTokens = cacheSimulation.cacheHits + cacheSimulation.cacheWriteTokens;
         console.log(
-          `Cacheable tokens (step 1): ${cacheSimulation.cacheableTokens.toLocaleString()}`,
+          `Cache reads: ${cacheSimulation.cacheHits.toLocaleString()} tokens`,
         );
         console.log(
-          `Cache hits (subsequent steps): ${cacheSimulation.cacheHits.toLocaleString()}`,
+          `Cache writes: ${cacheSimulation.cacheWriteTokens.toLocaleString()} tokens`,
         );
         console.log(
-          `Cache writes (new tokens): ${cacheSimulation.cacheWriteTokens.toLocaleString()}`,
+          `Total input tokens: ${totalCacheTokens.toLocaleString()} (reads + writes)`,
         );
         console.log(
           `Estimated cost with cache: ${formatCost(cacheSimulation.simulatedCostWithCache)}`,

@@ -127,9 +127,8 @@ export function simulateCacheSavings(
   const cacheWriteRate =
     pricing.cacheCreationInputTokenCost ?? pricing.inputCostPerToken * 1.25;
 
-  let totalCacheableTokens = 0; // Tokens written to cache in step 1 of each test
   let totalCacheHits = 0; // Total tokens read from cache across all steps
-  let totalCacheWriteTokens = 0; // Total tokens written to cache (including extensions)
+  let totalCacheWriteTokens = 0; // Total tokens written to cache (including step 1)
   let simulatedCost = 0;
 
   for (const test of tests) {
@@ -140,7 +139,6 @@ export function simulateCacheSavings(
 
     // Create cache with first step's input tokens
     const cache = new TokenCache(firstStep.usage.inputTokens, pricing);
-    totalCacheableTokens += firstStep.usage.inputTokens;
     totalCacheWriteTokens += firstStep.usage.inputTokens;
 
     // First step: pay cache creation rate for all input
@@ -173,7 +171,6 @@ export function simulateCacheSavings(
 
   return {
     simulatedCostWithCache: simulatedCost,
-    cacheableTokens: totalCacheableTokens,
     cacheHits: totalCacheHits,
     cacheWriteTokens: totalCacheWriteTokens,
   };

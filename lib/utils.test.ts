@@ -324,7 +324,6 @@ describe("simulateCacheSavings - growing prefix model", () => {
 
     expect(result).toEqual({
       simulatedCostWithCache: 0,
-      cacheableTokens: 0,
       cacheHits: 0,
       cacheWriteTokens: 0,
     });
@@ -353,7 +352,6 @@ describe("simulateCacheSavings - growing prefix model", () => {
 
     // Step 1: 1000 input tokens at cache write rate (1.25/MTok) + 500 output at $2/MTok
     // Simulated cost = 1000 * 1.25e-6 + 500 * 2e-6 = 0.00125 + 0.001 = 0.00225
-    expect(result.cacheableTokens).toBe(1000);
     expect(result.cacheHits).toBe(0);
     expect(result.cacheWriteTokens).toBe(1000);
     expect(result.simulatedCostWithCache).toBeCloseTo(0.00225, 6);
@@ -403,7 +401,6 @@ describe("simulateCacheSavings - growing prefix model", () => {
     //   Cost: 1500 * 0.1e-6 + 500 * 1.25e-6 + 400 * 2e-6 = 0.00015 + 0.000625 + 0.0008 = 0.001575
     // Total simulated: 0.00165 + 0.001325 + 0.001575 = 0.00455
 
-    expect(result.cacheableTokens).toBe(1000); // Step 1 input
     expect(result.cacheHits).toBe(1000 + 1500); // 1000 from step 2 + 1500 from step 3
     expect(result.cacheWriteTokens).toBe(1000 + 500 + 500); // 1000 step1 + 500 step2 + 500 step3
     expect(result.simulatedCostWithCache).toBeCloseTo(0.00455, 6);
@@ -469,17 +466,16 @@ describe("simulateCacheSavings - growing prefix model", () => {
     // Test 1:
     //   Step 1: 500 write, 100 output
     //   Step 2: 500 read, 300 write, 100 output
-    //   Cacheable: 500, Hits: 500, Writes: 500 + 300 = 800
+    //   Hits: 500, Writes: 500 + 300 = 800
     //
     // Test 2:
     //   Step 1: 600 write, 200 output
     //   Step 2: 600 read, 300 write, 200 output
     //   Step 3: 900 read, 300 write, 200 output
-    //   Cacheable: 600, Hits: 600 + 900 = 1500, Writes: 600 + 300 + 300 = 1200
+    //   Hits: 600 + 900 = 1500, Writes: 600 + 300 + 300 = 1200
 
-    // Total: cacheable = 500 + 600 = 1100, hits = 500 + 1500 = 2000, writes = 800 + 1200 = 2000
+    // Total: hits = 500 + 1500 = 2000, writes = 800 + 1200 = 2000
 
-    expect(result.cacheableTokens).toBe(1100);
     expect(result.cacheHits).toBe(2000);
     expect(result.cacheWriteTokens).toBe(2000);
 
@@ -523,7 +519,6 @@ describe("simulateCacheSavings - growing prefix model", () => {
     const result = simulateCacheSavings(tests, basicPricing);
 
     // Only test2 should be counted
-    expect(result.cacheableTokens).toBe(1000);
     expect(result.cacheHits).toBe(0);
     expect(result.cacheWriteTokens).toBe(1000);
   });
@@ -569,7 +564,6 @@ describe("simulateCacheSavings - growing prefix model", () => {
     //   = 1000 * 0.05e-6 + 500 * 1.5e-6 + 500 * 2e-6 = 0.00005 + 0.00075 + 0.001 = 0.0018
     // Total: 0.0025 + 0.0018 = 0.0043
 
-    expect(result.cacheableTokens).toBe(1000);
     expect(result.cacheHits).toBe(1000);
     expect(result.cacheWriteTokens).toBe(1000 + 500);
     expect(result.simulatedCostWithCache).toBeCloseTo(0.0043, 6);
@@ -607,7 +601,6 @@ describe("simulateCacheSavings - growing prefix model", () => {
     // Step 2: 1000 read (previous step), 0 new write (800 - 1000 = -200 → clamped to 0)
     // This tests the Math.max(0, newPortion) behavior
 
-    expect(result.cacheableTokens).toBe(1000);
     expect(result.cacheHits).toBe(1000); // Still reads full previous prefix
     expect(result.cacheWriteTokens).toBe(1000); // Only step 1 writes
   });
@@ -634,7 +627,6 @@ describe("simulateCacheSavings - growing prefix model", () => {
     const result = simulateCacheSavings(tests, basicPricing);
 
     expect(result.simulatedCostWithCache).toBe(0);
-    expect(result.cacheableTokens).toBe(0);
     expect(result.cacheHits).toBe(0);
     expect(result.cacheWriteTokens).toBe(0);
   });
