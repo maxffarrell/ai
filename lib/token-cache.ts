@@ -4,12 +4,16 @@ export class TokenCache {
   private currentTokens: number;
   private totalCachedTokens: number = 0;
   private messages: Array<{ message: string; tokens: number }> = [];
-  private pricing: NonNullable<ReturnType<typeof extractPricingFromGatewayModel>> | null;
+  private pricing: NonNullable<
+    ReturnType<typeof extractPricingFromGatewayModel>
+  > | null;
   private totalOutputTokens: number = 0;
 
   constructor(
     tokens: number,
-    pricing?: NonNullable<ReturnType<typeof extractPricingFromGatewayModel>> | null,
+    pricing?: NonNullable<
+      ReturnType<typeof extractPricingFromGatewayModel>
+    > | null,
   ) {
     this.currentTokens = tokens;
     this.pricing = pricing ?? null;
@@ -36,35 +40,39 @@ export class TokenCache {
   calculateCost(): {
     simulatedCost: number;
     cacheReadCost: number;
-    inputCost: number;
+    cacheWriteCost: number;
     outputCost: number;
   } {
-    if (!this.pricing) {
+    if (
+      !this.pricing ||
+      !this.pricing.cacheReadInputTokenCost ||
+      !this.pricing.cacheCreationInputTokenCost
+    ) {
       return {
         simulatedCost: 0,
         cacheReadCost: 0,
-        inputCost: 0,
+        cacheWriteCost: 0,
         outputCost: 0,
       };
     }
 
-    const cacheReadRate =
-      this.pricing.cacheReadInputTokenCost ??
-      this.pricing.inputCostPerToken * 0.1;
+    const cacheReadRate = this.pricing.cacheReadInputTokenCost;
 
-    // Cached tokens at cache read rate
+    const cacheWriteRate = this.pricing.cacheCreationInputTokenCost;
+
+    // Tokens read from cache across all API calls
     const cacheReadCost = this.totalCachedTokens * cacheReadRate;
 
-    // Current tokens (uncached portion) at full input rate
-    const inputCost = this.currentTokens * this.pricing.inputCostPerToken;
+    // Tokens written to cache across all API calls (all current tokens were written at some point)
+    const cacheWriteCost = this.currentTokens * cacheWriteRate;
 
     // Output tokens at output rate
     const outputCost = this.totalOutputTokens * this.pricing.outputCostPerToken;
 
     return {
-      simulatedCost: cacheReadCost + inputCost + outputCost,
+      simulatedCost: cacheReadCost + cacheWriteCost + outputCost,
       cacheReadCost,
-      inputCost,
+      cacheWriteCost,
       outputCost,
     };
   }
