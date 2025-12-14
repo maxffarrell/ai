@@ -179,6 +179,7 @@ async function selectOptions() {
       { value: "http", label: "MCP over HTTP" },
       { value: "stdio", label: "MCP over StdIO" },
     ],
+    initialValue: "http",
   });
 
   if (isCancel(mcp_integration)) {
