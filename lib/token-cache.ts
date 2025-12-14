@@ -37,7 +37,7 @@ export class TokenCache {
     };
   }
 
-  calculateCost(): {
+  calculateSimulatedCost(): {
     simulatedCost: number;
     cacheReadCost: number;
     cacheWriteCost: number;

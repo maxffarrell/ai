@@ -97,29 +97,16 @@ export function calculateCost(
   pricing: NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>,
   inputTokens: number,
   outputTokens: number,
-  cachedInputTokens: number = 0,
 ) {
-  // Calculate uncached input tokens
-  const uncachedInputTokens = inputTokens - cachedInputTokens;
-
-  // Bill uncached tokens at full rate
-  const inputCost = uncachedInputTokens * pricing.inputCostPerToken;
-
-  // Bill cached tokens at reduced rate (or free if no rate specified)
-  const cacheReadCost = pricing.cacheReadInputTokenCost
-    ? cachedInputTokens * pricing.cacheReadInputTokenCost
-    : 0;
-
+  const inputCost = inputTokens * pricing.inputCostPerToken;
   const outputCost = outputTokens * pricing.outputCostPerToken;
 
   return {
     inputCost,
     outputCost,
-    cacheReadCost,
-    totalCost: inputCost + outputCost + cacheReadCost,
+    totalCost: inputCost + outputCost,
     inputTokens,
     outputTokens,
-    cachedInputTokens,
   };
 }
 

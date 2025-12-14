@@ -74,13 +74,11 @@ export function calculateTotalCost(
     pricing,
     totalInputTokens,
     totalOutputTokens,
-    totalCachedInputTokens,
   );
 
   return {
     inputCost: costResult.inputCost,
     outputCost: costResult.outputCost,
-    cacheReadCost: costResult.cacheReadCost,
     totalCost: costResult.totalCost,
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,

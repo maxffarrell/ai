@@ -43,10 +43,7 @@ async function validateAndConfirmPricing(
   models: string[],
   pricingMap: ReturnType<typeof buildPricingMap>,
 ) {
-  const lookups = new Map<
-    string,
-    ReturnType<typeof lookupPricingFromMap>
-  >();
+  const lookups = new Map<string, ReturnType<typeof lookupPricingFromMap>>();
 
   for (const modelId of models) {
     const lookup = lookupPricingFromMap(modelId, pricingMap);
@@ -563,7 +560,7 @@ async function main() {
       );
       if (totalCost.cachedInputTokens > 0) {
         console.log(
-          `Cached tokens (read): ${totalCost.cachedInputTokens.toLocaleString()} (${formatCost(totalCost.cacheReadCost)})`,
+          `Cached tokens: ${totalCost.cachedInputTokens.toLocaleString()}`,
         );
       }
       console.log(`Total cost: ${formatCost(totalCost.totalCost)}`);
@@ -573,10 +570,14 @@ async function main() {
         testResults,
         pricingLookup.pricing,
       );
-      if (cacheSimulation.cacheHits > 0 || cacheSimulation.cacheWriteTokens > 0) {
+      if (
+        cacheSimulation.cacheHits > 0 ||
+        cacheSimulation.cacheWriteTokens > 0
+      ) {
         console.log("\n📊 Cache Simulation (estimated with prompt caching):");
         console.log("─".repeat(50));
-        const totalCacheTokens = cacheSimulation.cacheHits + cacheSimulation.cacheWriteTokens;
+        const totalCacheTokens =
+          cacheSimulation.cacheHits + cacheSimulation.cacheWriteTokens;
         console.log(
           `Cache reads: ${cacheSimulation.cacheHits.toLocaleString()} tokens`,
         );
@@ -589,7 +590,8 @@ async function main() {
         console.log(
           `Estimated cost with cache: ${formatCost(cacheSimulation.simulatedCostWithCache)}`,
         );
-        const savings = totalCost.totalCost - cacheSimulation.simulatedCostWithCache;
+        const savings =
+          totalCost.totalCost - cacheSimulation.simulatedCostWithCache;
         const savingsPercent = (savings / totalCost.totalCost) * 100;
         if (savings > 0) {
           console.log(

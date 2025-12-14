@@ -282,9 +282,6 @@ function renderPricingSection(data: MultiTestResultData) {
 
   let costBreakdownHtml = "";
   if (totalCost) {
-    const uncachedInputTokens =
-      totalCost.inputTokens - totalCost.cachedInputTokens;
-
     const cacheSimRow =
       data.metadata.cacheSimulation &&
       pricing?.cacheReadCostPerMTok !== undefined &&
@@ -303,7 +300,7 @@ function renderPricingSection(data: MultiTestResultData) {
       <div class="cost-breakdown">
         <div class="cost-row">
           <span class="cost-label">Input tokens:</span>
-          <span class="cost-tokens">${uncachedInputTokens.toLocaleString()}</span>
+          <span class="cost-tokens">${totalCost.inputTokens.toLocaleString()}</span>
           <span class="cost-value">${formatCost(totalCost.inputCost)}</span>
         </div>
         <div class="cost-row">
@@ -315,9 +312,9 @@ function renderPricingSection(data: MultiTestResultData) {
           totalCost.cachedInputTokens > 0
             ? `
         <div class="cost-row cached">
-          <span class="cost-label">Cached tokens (read):</span>
+          <span class="cost-label">Cached tokens (from usage):</span>
           <span class="cost-tokens">${totalCost.cachedInputTokens.toLocaleString()} ⚡</span>
-          <span class="cost-value">${formatCost(totalCost.cacheReadCost)}</span>
+          <span class="cost-value">-</span>
         </div>
         `
             : ""

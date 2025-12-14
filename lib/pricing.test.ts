@@ -208,71 +208,29 @@ describe("calculateCost", () => {
   } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
 
   describe("basic cost calculation", () => {
-    it("should calculate cost with no cached tokens", () => {
-      const result = calculateCost(basePricing, 1000, 500, 0);
+    it("should calculate cost correctly", () => {
+      const result = calculateCost(basePricing, 1000, 500);
 
       expect(result.inputTokens).toBe(1000);
       expect(result.outputTokens).toBe(500);
-      expect(result.cachedInputTokens).toBe(0);
       expect(result.inputCost).toBe(0.003); // 1000 * $3/MTok
       expect(result.outputCost).toBeCloseTo(0.0075); // 500 * $15/MTok
-      expect(result.cacheReadCost).toBe(0);
       expect(result.totalCost).toBe(0.0105);
     });
-
-    it("should default cachedInputTokens to 0", () => {
-      const result = calculateCost(basePricing, 1000, 500);
-
-      expect(result.cachedInputTokens).toBe(0);
-      expect(result.inputCost).toBe(0.003);
-    });
   });
 
-  describe("cached token billing", () => {
-    it("should bill cached tokens at reduced rate", () => {
-      // 1000 input tokens, 800 are cached
-      const result = calculateCost(pricingWithCache, 1000, 500, 800);
-
-      expect(result.inputTokens).toBe(1000);
-      expect(result.cachedInputTokens).toBe(800);
-      // Uncached: 200 tokens * $3/MTok = $0.0006
-      expect(result.inputCost).toBeCloseTo(0.0006);
-      // Cached: 800 tokens * $0.30/MTok = $0.00024
-      expect(result.cacheReadCost).toBeCloseTo(0.00024);
-      // Output: 500 * $15/MTok = $0.0075
-      expect(result.outputCost).toBeCloseTo(0.0075);
-      expect(result.totalCost).toBeCloseTo(0.00834);
-    });
-
-    it("should treat cached tokens as free when no cache rate specified", () => {
-      // Using basePricing which has no cacheReadInputTokenCost
-      const result = calculateCost(basePricing, 1000, 500, 800);
-
-      // Only 200 uncached tokens should be billed
-      expect(result.inputCost).toBeCloseTo(0.0006);
-      expect(result.cacheReadCost).toBe(0);
-    });
-
-    it("should handle all tokens being cached", () => {
-      const result = calculateCost(pricingWithCache, 1000, 500, 1000);
-
-      expect(result.inputCost).toBe(0);
-      expect(result.cacheReadCost).toBe(0.0003); // 1000 * $0.30/MTok
-    });
-  });
 
   describe("edge cases", () => {
     it("should handle zero tokens", () => {
-      const result = calculateCost(basePricing, 0, 0, 0);
+      const result = calculateCost(basePricing, 0, 0);
 
       expect(result.inputCost).toBe(0);
       expect(result.outputCost).toBe(0);
-      expect(result.cacheReadCost).toBe(0);
       expect(result.totalCost).toBe(0);
     });
 
     it("should handle large token counts", () => {
-      const result = calculateCost(basePricing, 1_000_000, 500_000, 0);
+      const result = calculateCost(basePricing, 1_000_000, 500_000);
 
       expect(result.inputCost).toBe(3); // 1M * $3/MTok
       expect(result.outputCost).toBe(7.5); // 500K * $15/MTok
@@ -284,7 +242,7 @@ describe("calculateCost", () => {
         inputCostPerToken: 0,
         outputCostPerToken: 0,
       } satisfies NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>;
-      const result = calculateCost(freePricing, 1000, 500, 0);
+      const result = calculateCost(freePricing, 1000, 500);
 
       expect(result.totalCost).toBe(0);
     });

@@ -119,7 +119,6 @@ describe("calculateTotalCost", () => {
     expect(result).toEqual({
       inputCost: 0,
       outputCost: 0,
-      cacheReadCost: 0,
       totalCost: 0,
       inputTokens: 0,
       outputTokens: 0,
@@ -171,21 +170,18 @@ describe("calculateTotalCost", () => {
     // Total Input: 100 + 200 + 300 = 600
     // Total Output: 50 + 100 + 150 = 300
     // Total Cached: 10 + 0 + 20 = 30
-    // Uncached Input: 600 - 30 = 570
 
-    // Costs (per Token):
-    // Input: 570 * (1.0 / 1e6) = 0.00057
+    // Costs (per Token) - calculateCost bills all input at full rate:
+    // Input: 600 * (1.0 / 1e6) = 0.0006
     // Output: 300 * (2.0 / 1e6) = 0.0006
-    // Cache: 30 * (0.1 / 1e6) = 0.000003
-    // Total: 0.00057 + 0.0006 + 0.000003 = 0.001173
+    // Total: 0.0006 + 0.0006 = 0.0012
 
     const result = calculateTotalCost(tests, pricing);
 
     expect(result).toEqual({
-      inputCost: 0.00057,
+      inputCost: 0.0006,
       outputCost: 0.0006,
-      cacheReadCost: 0.000003,
-      totalCost: 0.001173,
+      totalCost: 0.0012,
       inputTokens: 600,
       outputTokens: 300,
       cachedInputTokens: 30,
@@ -249,7 +245,7 @@ describe("TokenCache", () => {
     cache.addMessage("msg1", 50, 200);
     cache.addMessage("msg2", 100, 300);
 
-    const cost = cache.calculateCost();
+    const cost = cache.calculateSimulatedCost();
 
     // totalCachedTokens = 100 + 150 = 250 (tokens read from cache across calls)
     // currentTokens = 250 (all tokens written to cache)
@@ -271,7 +267,7 @@ describe("TokenCache", () => {
 
     cache.addMessage("msg1", 50, 200);
 
-    const cost = cache.calculateCost();
+    const cost = cache.calculateSimulatedCost();
 
     expect(cost.cacheReadCost).toBe(0);
     expect(cost.cacheWriteCost).toBe(0);
@@ -287,7 +283,7 @@ describe("TokenCache", () => {
     expect(stats.currentContextTokens).toBe(0);
     expect(stats.messageCount).toBe(0);
 
-    const cost = cache.calculateCost();
+    const cost = cache.calculateSimulatedCost();
     expect(cost.simulatedCost).toBe(0);
   });
 });
