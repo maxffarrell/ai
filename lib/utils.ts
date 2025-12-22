@@ -105,22 +105,22 @@ export async function withRetry<T>(
     minTimeout,
     factor,
     randomize: true, // Adds jitter to prevent thundering herd
-    onFailedAttempt: (error) => {
+    onFailedAttempt: ({ error, attemptNumber, retriesLeft }) => {
       // Log the error
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.log(`  ⚠️  Error: ${errorMessage}`);
 
       // Calculate the delay for this attempt
-      const attemptDelay = minTimeout * Math.pow(factor, error.attemptNumber - 1);
+      const attemptDelay = minTimeout * Math.pow(factor, attemptNumber - 1);
 
-      if (error.attemptNumber < retries + 1) {
+      if (retriesLeft > 0) {
         console.log(
-          `  🔄 Retrying in ~${(attemptDelay / 1000).toFixed(1)}s (attempt ${error.attemptNumber}/${retries + 1})...`,
+          `  🔄 Retrying in ~${(attemptDelay / 1000).toFixed(1)}s (attempt ${attemptNumber}/${retries + 1})...`,
         );
       } else {
         console.log(`  ✗ Max retries (${retries}) exceeded`);
       }
     },
-  } as PRetryOptions);
+  });
 }
