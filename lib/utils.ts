@@ -1,5 +1,6 @@
 import { calculateCost, type ModelPricing } from "./pricing.ts";
 import type { SingleTestResult, TotalCostInfo } from "./report.ts";
+import pRetry, { type Options as PRetryOptions } from "p-retry";
 
 export function sanitizeModelName(modelName: string) {
   return modelName.replace(/[^a-zA-Z0-9.]/g, "-");
@@ -83,4 +84,43 @@ export function calculateTotalCost(
     outputTokens: totalOutputTokens,
     cachedInputTokens: totalCachedInputTokens,
   };
+}
+
+/**
+ * Retry a function with exponential backoff using p-retry
+ * Logs all errors and retry attempts to console
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    retries?: number;
+    minTimeout?: number;
+    factor?: number;
+  } = {},
+): Promise<T> {
+  const { retries = 10, minTimeout = 1000, factor = 2 } = options;
+
+  return pRetry(fn, {
+    retries,
+    minTimeout,
+    factor,
+    randomize: true, // Adds jitter to prevent thundering herd
+    onFailedAttempt: (error) => {
+      // Log the error
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.log(`  ⚠️  Error: ${errorMessage}`);
+
+      // Calculate the delay for this attempt
+      const attemptDelay = minTimeout * Math.pow(factor, error.attemptNumber - 1);
+
+      if (error.attemptNumber < retries + 1) {
+        console.log(
+          `  🔄 Retrying in ~${(attemptDelay / 1000).toFixed(1)}s (attempt ${error.attemptNumber}/${retries + 1})...`,
+        );
+      } else {
+        console.log(`  ✗ Max retries (${retries}) exceeded`);
+      }
+    },
+  } as PRetryOptions);
 }
