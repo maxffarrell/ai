@@ -237,6 +237,57 @@ function parseCommandString(commandString: string): {
   return { command, args };
 }
 
+/**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Execute a function with exponential backoff retry on any error
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 10,
+  baseDelay: number = 1000,
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      // Log the error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log(`  ⚠️  Error: ${errorMessage}`);
+
+      // If we've exhausted all retries, throw the error
+      if (attempt === maxRetries) {
+        console.log(`  ✗ Max retries (${maxRetries}) exceeded`);
+        throw error;
+      }
+
+      // Calculate exponential backoff delay: baseDelay * 2^attempt
+      // For example: 1s, 2s, 4s, 8s, 16s, 32s, 64s...
+      const delay = baseDelay * Math.pow(2, attempt);
+      const jitter = Math.random() * 0.1 * delay; // Add 0-10% jitter
+      const totalDelay = Math.floor(delay + jitter);
+
+      console.log(
+        `  🔄 Retrying in ${(totalDelay / 1000).toFixed(1)}s (attempt ${attempt + 1}/${maxRetries + 1})...`,
+      );
+
+      await sleep(totalDelay);
+    }
+  }
+
+  // This should never be reached due to the throw in the loop, but TypeScript needs it
+  throw lastError;
+}
+
 async function runSingleTest(
   test: TestDefinition,
   model: LanguageModel,
@@ -301,7 +352,13 @@ async function runSingleTest(
     if (testComponentEnabled) {
       console.log("  📋 TestComponent tool is available");
     }
-    const result = await agent.generate({ prompt: fullPrompt });
+
+    // Wrap agent.generate with retry logic
+    const result = await withRetry(
+      async () => agent.generate({ prompt: fullPrompt }),
+      10, // max 10 retries
+      1000, // start with 1 second delay
+    );
 
     const resultWriteContent = extractResultWriteContent(result.steps);
 
