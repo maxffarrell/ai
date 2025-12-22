@@ -8,6 +8,7 @@
 
   // Using $inspect(...).with
   $inspect(text).with((type, value) => {
+    console.log(type); // Log "init" or "update"
     if (type === "update") {
       console.log(`Text updated to: "${value}"`);
     }
