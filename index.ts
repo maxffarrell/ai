@@ -1,7 +1,7 @@
 import { Experimental_Agent as Agent, hasToolCall, stepCountIs } from "ai";
 import { experimental_createMCPClient as createMCPClient } from "./node_modules/@ai-sdk/mcp/dist/index.mjs";
 import { Experimental_StdioMCPTransport as StdioMCPTransport } from "./node_modules/@ai-sdk/mcp/dist/mcp-stdio/index.mjs";
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import {
   generateReport,
   type SingleTestResult,
@@ -47,9 +47,41 @@ import {
 } from "@clack/prompts";
 import { gateway } from "ai";
 
+// Settings persistence
+const SETTINGS_FILE = ".ai-settings.json";
+
+interface SavedSettings {
+  models: string[];
+  mcpIntegration: "none" | "http" | "stdio";
+  mcpServerUrl?: string;
+  testingTool: boolean;
+  pricingEnabled: boolean;
+}
+
+function loadSettings(): SavedSettings | null {
+  try {
+    if (existsSync(SETTINGS_FILE)) {
+      const content = readFileSync(SETTINGS_FILE, "utf-8");
+      return JSON.parse(content) as SavedSettings;
+    }
+  } catch (error) {
+    console.warn("⚠️  Could not load saved settings, using defaults");
+  }
+  return null;
+}
+
+function saveSettings(settings: SavedSettings): void {
+  try {
+    writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  } catch (error) {
+    console.warn("⚠️  Could not save settings");
+  }
+}
+
 async function validateAndConfirmPricing(
   models: string[],
   pricingMap: Map<string, ModelPricingLookup | null>,
+  savedPricingEnabled?: boolean,
 ) {
   const lookups = new Map<string, ModelPricingLookup | null>();
 
@@ -72,7 +104,7 @@ async function validateAndConfirmPricing(
 
     const usePricing = await confirm({
       message: "Enable cost calculation?",
-      initialValue: true,
+      initialValue: savedPricingEnabled ?? true,
     });
 
     if (isCancel(usePricing)) {
@@ -125,23 +157,38 @@ async function validateAndConfirmPricing(
 async function selectOptions() {
   intro("🚀 Svelte AI Bench");
 
+  // Load saved settings
+  const savedSettings = loadSettings();
+  if (savedSettings) {
+    note("Loaded previous settings as defaults", "📋 Saved Settings");
+  }
+
   const availableModels = await gateway.getAvailableModels();
 
   const gatewayModels = availableModels.models as GatewayModel[];
   const pricingMap = buildPricingMap(gatewayModels);
 
+  // Build model options with saved selections
+  const modelOptions = [{ value: "custom", label: "Custom" }].concat(
+    availableModels.models.reduce<Array<{ value: string; label: string }>>(
+      (arr, model) => {
+        if (model.modelType === "language") {
+          arr.push({ value: model.id, label: model.name });
+        }
+        return arr;
+      },
+      [],
+    ),
+  );
+
+  // Determine initial values for model selection
+  const savedModelValues = savedSettings?.models ?? [];
+
   const models = await multiselect({
     message: "Select model(s) to benchmark",
-    options: [{ value: "custom", label: "Custom" }].concat(
-      availableModels.models.reduce<Array<{ value: string; label: string }>>(
-        (arr, model) => {
-          if (model.modelType === "language") {
-            arr.push({ value: model.id, label: model.name });
-          }
-          return arr;
-        },
-        [],
-      ),
+    options: modelOptions,
+    initialValues: savedModelValues.filter((m) =>
+      modelOptions.some((opt) => opt.value === m),
     ),
   });
 
@@ -163,7 +210,14 @@ async function selectOptions() {
 
   const selectedModels = models.filter((model) => model !== "custom");
 
-  const pricing = await validateAndConfirmPricing(selectedModels, pricingMap);
+  const pricing = await validateAndConfirmPricing(
+    selectedModels,
+    pricingMap,
+    savedSettings?.pricingEnabled,
+  );
+
+  // Determine saved MCP integration type
+  const savedMcpIntegration = savedSettings?.mcpIntegration ?? "none";
 
   const mcpIntegration = await select({
     message: "Which MCP integration to use?",
@@ -172,6 +226,7 @@ async function selectOptions() {
       { value: "http", label: "MCP over HTTP" },
       { value: "stdio", label: "MCP over StdIO" },
     ],
+    initialValue: savedMcpIntegration,
   });
 
   if (isCancel(mcpIntegration)) {
@@ -180,11 +235,27 @@ async function selectOptions() {
   }
 
   let mcp: string | undefined = undefined;
+  let mcpIntegrationType: "none" | "http" | "stdio" = "none";
 
   if (mcpIntegration !== "none") {
+    mcpIntegrationType = mcpIntegration as "http" | "stdio";
+
+    // Check if we have a saved custom MCP URL for this integration type
+    const savedMcpUrl = savedSettings?.mcpServerUrl;
+    const defaultMcpUrl =
+      mcpIntegration === "http"
+        ? "https://mcp.svelte.dev/mcp"
+        : "npx -y @sveltejs/mcp";
+
+    // Determine if the saved URL is custom (different from default)
+    const hasSavedCustomUrl =
+      savedMcpUrl &&
+      savedSettings?.mcpIntegration === mcpIntegration &&
+      savedMcpUrl !== defaultMcpUrl;
+
     const custom = await confirm({
       message: "Do you want to provide a custom MCP server/command?",
-      initialValue: false,
+      initialValue: hasSavedCustomUrl ?? false,
     });
 
     if (isCancel(custom)) {
@@ -195,6 +266,7 @@ async function selectOptions() {
     if (custom) {
       const customMcp = await text({
         message: "Insert custom url or command",
+        initialValue: hasSavedCustomUrl ? savedMcpUrl : undefined,
       });
       if (isCancel(customMcp)) {
         cancel("Operation cancelled.");
@@ -203,22 +275,29 @@ async function selectOptions() {
 
       mcp = customMcp;
     } else {
-      mcp =
-        mcpIntegration === "http"
-          ? "https://mcp.svelte.dev/mcp"
-          : "npx -y @sveltejs/mcp";
+      mcp = defaultMcpUrl;
     }
   }
 
   const testingTool = await confirm({
     message: "Do you want to provide the testing tool to the model?",
-    initialValue: true,
+    initialValue: savedSettings?.testingTool ?? true,
   });
 
   if (isCancel(testingTool)) {
     cancel("Operation cancelled.");
     process.exit(0);
   }
+
+  // Save settings for next run
+  const newSettings: SavedSettings = {
+    models: selectedModels,
+    mcpIntegration: mcpIntegrationType,
+    mcpServerUrl: mcp,
+    testingTool,
+    pricingEnabled: pricing.enabled,
+  };
+  saveSettings(newSettings);
 
   return {
     models: selectedModels,
