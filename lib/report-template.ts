@@ -1,6 +1,6 @@
 import type { TestVerificationResult } from "./output-test-runner.ts";
 import type { ValidationResult } from "./validator-runner.ts";
-import type { MultiTestResultData, SingleTestResult } from "./report.ts";
+import type { MultiTestResultData, SingleTestResult, UnitTestTotals } from "./report.ts";
 import { getReportStyles } from "./report-styles.ts";
 import { formatCost, formatMTokCost } from "./pricing.ts";
 
@@ -361,6 +361,13 @@ function renderPricingSection(data: MultiTestResultData) {
   `;
 }
 
+function getScoreClass(score: number): string {
+  if (score >= 90) return "excellent";
+  if (score >= 70) return "good";
+  if (score >= 50) return "fair";
+  return "poor";
+}
+
 function getPricingStyles() {
   return `
     .pricing-section {
@@ -531,63 +538,59 @@ function getPricingStyles() {
       margin: 4px 0;
     }
 
-    /* Summary bar enhancements */
-    .summary-section {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .summary-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .summary-label {
-      font-size: 12px;
+    /* Unit test inline styles */
+    .unit-tests-inline {
+      font-size: 11px;
       color: var(--text-muted);
-      min-width: 80px;
+      margin-left: 4px;
     }
 
-    .summary-items {
-      display: flex;
-      gap: 16px;
-    }
-
-    .unit-tests-summary {
-      background: var(--bg);
-      border: 1px solid var(--border);
+    /* Score badge styles */
+    .score-badge {
+      font-size: 13px;
+      padding: 3px 10px;
       border-radius: 4px;
-      padding: 8px 12px;
-      margin-top: 8px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      margin-left: auto;
+    }
+
+    .score-badge.excellent {
+      background: var(--success);
+      color: white;
+    }
+
+    .score-badge.good {
+      background: #2ea043;
+      color: white;
+    }
+
+    .score-badge.fair {
+      background: var(--warning);
+      color: white;
+    }
+
+    .score-badge.poor {
+      background: var(--error);
+      color: white;
+    }
+
+    /* Summary bar improvements */
+    .summary-bar {
       display: flex;
       align-items: center;
       gap: 16px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      flex-wrap: wrap;
     }
 
-    .unit-tests-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    .unit-tests-stats {
+    .summary-group {
       display: flex;
+      align-items: center;
       gap: 12px;
     }
-
-    .unit-test-stat {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .unit-test-stat.passed { color: var(--success); }
-    .unit-test-stat.failed { color: var(--error); }
-    .unit-test-stat.total { color: var(--text); }
   `;
 }
 
@@ -601,11 +604,13 @@ export function generateMultiTestHtml(data: MultiTestResultData) {
   const skippedTests = data.tests.filter((t) => !t.verification).length;
 
   // Calculate unit test totals from metadata or compute them
-  const unitTestTotals = metadata.unitTestTotals ?? {
-    total: data.tests.reduce((sum, t) => sum + (t.verification?.numTests ?? 0), 0),
-    passed: data.tests.reduce((sum, t) => sum + (t.verification?.numPassed ?? 0), 0),
-    failed: data.tests.reduce((sum, t) => sum + (t.verification?.numFailed ?? 0), 0),
-  };
+  const unitTestTotals: UnitTestTotals = metadata.unitTestTotals ?? (() => {
+    const total = data.tests.reduce((sum, t) => sum + (t.verification?.numTests ?? 0), 0);
+    const passed = data.tests.reduce((sum, t) => sum + (t.verification?.numPassed ?? 0), 0);
+    const failed = data.tests.reduce((sum, t) => sum + (t.verification?.numFailed ?? 0), 0);
+    const score = total > 0 ? Math.round((passed / total) * 100) : 0;
+    return { total, passed, failed, score };
+  })();
 
   const totalTokens = data.tests.reduce(
     (sum, test) =>
@@ -631,12 +636,7 @@ export function generateMultiTestHtml(data: MultiTestResultData) {
     ? `<span class="cost-badge">${formatCost(metadata.totalCost.totalCost)}</span>`
     : "";
 
-  const overallStatus =
-    failedTests === 0 && skippedTests === 0
-      ? "all-passed"
-      : failedTests > 0
-        ? "has-failures"
-        : "has-skipped";
+  const scoreClass = getScoreClass(unitTestTotals.score);
 
   const testsHtml = data.tests
     .map((test, index) => renderTestSection(test, index))
@@ -677,17 +677,13 @@ export function generateMultiTestHtml(data: MultiTestResultData) {
       <button class="theme-toggle" onclick="toggleTheme()">◐</button>
     </div>
     <div class="summary-bar">
-      <div class="summary-item passed">✓ ${passedTests} passed</div>
-      <div class="summary-item failed">✗ ${failedTests} failed</div>
-      ${skippedTests > 0 ? `<div class="summary-item skipped">⊘ ${skippedTests} skipped</div>` : ""}
-    </div>
-    <div class="unit-tests-summary">
-      <span class="unit-tests-label">Unit Tests:</span>
-      <div class="unit-tests-stats">
-        <span class="unit-test-stat passed">✓ ${unitTestTotals.passed} passed</span>
-        <span class="unit-test-stat failed">✗ ${unitTestTotals.failed} failed</span>
-        <span class="unit-test-stat total">${unitTestTotals.total} total</span>
+      <div class="summary-group">
+        <div class="summary-item passed">✓ ${passedTests} passed</div>
+        <div class="summary-item failed">✗ ${failedTests} failed</div>
+        ${skippedTests > 0 ? `<div class="summary-item skipped">⊘ ${skippedTests} skipped</div>` : ""}
+        <span class="unit-tests-inline">(${unitTestTotals.passed}/${unitTestTotals.total} unit tests)</span>
       </div>
+      <span class="score-badge ${scoreClass}" title="Score: ${unitTestTotals.passed} passed / ${unitTestTotals.total} total unit tests">${unitTestTotals.score}%</span>
     </div>
   </header>
 

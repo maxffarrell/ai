@@ -627,11 +627,9 @@ async function main() {
 
     console.log("─".repeat(50));
     console.log(
-      `Test Suites: ${passed} passed, ${failed} failed, ${skipped} skipped`,
+      `Test Suites: ✓ ${passed} passed  ✗ ${failed} failed  ${skipped > 0 ? `⊘ ${skipped} skipped  ` : ""}(${unitTestTotals.passed}/${unitTestTotals.total} unit tests)`,
     );
-    console.log(
-      `Unit Tests:  ${unitTestTotals.passed} passed, ${unitTestTotals.failed} failed, ${unitTestTotals.total} total`,
-    );
+    console.log(`Score:       ${unitTestTotals.score}%`);
     console.log(`Duration:    ${(totalDuration / 1000).toFixed(1)}s`);
 
     let totalCost = null;

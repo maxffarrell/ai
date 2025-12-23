@@ -1,13 +1,51 @@
 import { describe, it, expect } from "vitest";
-import { calculateUnitTestTotals, type SingleTestResult } from "./report.ts";
+import { calculateUnitTestTotals, calculateScore, type SingleTestResult } from "./report.ts";
+
+describe("calculateScore", () => {
+  it("returns 0 for zero total tests", () => {
+    expect(calculateScore(0, 0)).toBe(0);
+  });
+
+  it("returns 100 for all tests passed", () => {
+    expect(calculateScore(10, 10)).toBe(100);
+    expect(calculateScore(20, 20)).toBe(100);
+    expect(calculateScore(1, 1)).toBe(100);
+  });
+
+  it("returns 0 for no tests passed", () => {
+    expect(calculateScore(0, 10)).toBe(0);
+    expect(calculateScore(0, 5)).toBe(0);
+  });
+
+  it("returns 50 for half tests passed", () => {
+    expect(calculateScore(5, 10)).toBe(50);
+    expect(calculateScore(10, 20)).toBe(50);
+  });
+
+  it("rounds to nearest integer", () => {
+    // 1/3 = 33.33... -> 33
+    expect(calculateScore(1, 3)).toBe(33);
+    // 2/3 = 66.66... -> 67
+    expect(calculateScore(2, 3)).toBe(67);
+    // 7/9 = 77.77... -> 78
+    expect(calculateScore(7, 9)).toBe(78);
+  });
+
+  it("handles various percentages correctly", () => {
+    expect(calculateScore(9, 10)).toBe(90);
+    expect(calculateScore(3, 4)).toBe(75);
+    expect(calculateScore(1, 4)).toBe(25);
+    expect(calculateScore(24, 27)).toBe(89);
+  });
+});
 
 describe("calculateUnitTestTotals", () => {
   it("returns zeros for empty test array", () => {
     const result = calculateUnitTestTotals([]);
-    expect(result).toEqual({ total: 0, passed: 0, failed: 0 });
+    expect(result).toEqual({ total: 0, passed: 0, failed: 0, score: 0 });
   });
 
-  it("calculates totals from single test", () => {
+  it("calculates totals and score from single test", () => {
     const tests: SingleTestResult[] = [
       {
         testName: "test1",
@@ -26,10 +64,10 @@ describe("calculateUnitTestTotals", () => {
     ];
 
     const result = calculateUnitTestTotals(tests);
-    expect(result).toEqual({ total: 5, passed: 4, failed: 1 });
+    expect(result).toEqual({ total: 5, passed: 4, failed: 1, score: 80 });
   });
 
-  it("aggregates totals from multiple tests", () => {
+  it("aggregates totals from multiple tests and calculates correct score", () => {
     const tests: SingleTestResult[] = [
       {
         testName: "test1",
@@ -80,6 +118,7 @@ describe("calculateUnitTestTotals", () => {
       total: 9, // 3 + 4 + 2
       passed: 7, // 3 + 2 + 2
       failed: 2, // 0 + 2 + 0
+      score: 78, // 7/9 = 77.77... -> 78
     });
   });
 
@@ -127,6 +166,7 @@ describe("calculateUnitTestTotals", () => {
       total: 8, // 5 + 0 + 3
       passed: 6, // 5 + 0 + 1
       failed: 2, // 0 + 0 + 2
+      score: 75, // 6/8 = 75%
     });
   });
 
@@ -149,6 +189,74 @@ describe("calculateUnitTestTotals", () => {
     ];
 
     const result = calculateUnitTestTotals(tests);
-    expect(result).toEqual({ total: 0, passed: 0, failed: 0 });
+    expect(result).toEqual({ total: 0, passed: 0, failed: 0, score: 0 });
+  });
+
+  it("calculates 100% score when all tests pass", () => {
+    const tests: SingleTestResult[] = [
+      {
+        testName: "test1",
+        prompt: "prompt1",
+        steps: [],
+        resultWriteContent: null,
+        verification: {
+          testName: "test1",
+          passed: true,
+          numTests: 10,
+          numPassed: 10,
+          numFailed: 0,
+          duration: 100,
+        },
+      },
+      {
+        testName: "test2",
+        prompt: "prompt2",
+        steps: [],
+        resultWriteContent: null,
+        verification: {
+          testName: "test2",
+          passed: true,
+          numTests: 5,
+          numPassed: 5,
+          numFailed: 0,
+          duration: 50,
+        },
+      },
+    ];
+
+    const result = calculateUnitTestTotals(tests);
+    expect(result).toEqual({
+      total: 15,
+      passed: 15,
+      failed: 0,
+      score: 100,
+    });
+  });
+
+  it("calculates 0% score when all tests fail", () => {
+    const tests: SingleTestResult[] = [
+      {
+        testName: "test1",
+        prompt: "prompt1",
+        steps: [],
+        resultWriteContent: null,
+        verification: {
+          testName: "test1",
+          passed: false,
+          numTests: 5,
+          numPassed: 0,
+          numFailed: 5,
+          duration: 100,
+        },
+      },
+    ];
+
+    const result = calculateUnitTestTotals(tests);
+    expect(result).toEqual({
+      total: 5,
+      passed: 0,
+      failed: 5,
+      score: 0,
+    });
   });
 });

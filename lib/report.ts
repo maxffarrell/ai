@@ -86,6 +86,7 @@ export interface UnitTestTotals {
   total: number;
   passed: number;
   failed: number;
+  score: number;
 }
 
 interface Metadata {
@@ -119,6 +120,18 @@ interface LegacyResultData {
   metadata?: Metadata;
 }
 
+/**
+ * Calculate the score as a percentage of passed unit tests.
+ * Score = (passed / total) * 100, rounded to nearest integer.
+ * Returns 0 if no tests were run.
+ */
+export function calculateScore(passed: number, total: number): number {
+  if (total === 0) {
+    return 0;
+  }
+  return Math.round((passed / total) * 100);
+}
+
 export function calculateUnitTestTotals(tests: SingleTestResult[]): UnitTestTotals {
   let total = 0;
   let passed = 0;
@@ -132,7 +145,9 @@ export function calculateUnitTestTotals(tests: SingleTestResult[]): UnitTestTota
     }
   }
 
-  return { total, passed, failed };
+  const score = calculateScore(passed, total);
+
+  return { total, passed, failed, score };
 }
 
 export async function generateReport(
