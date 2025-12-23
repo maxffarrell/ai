@@ -250,7 +250,7 @@ async function selectOptions() {
 
     // Determine if the saved URL is custom (different from default)
     const hasSavedCustomUrl =
-      savedMcpUrl &&
+      !!savedMcpUrl &&
       savedSettings?.mcpIntegration === mcpIntegration &&
       savedMcpUrl !== defaultMcpUrl;
 
@@ -609,20 +609,22 @@ async function main() {
           ? "PASSED"
           : "FAILED"
         : "SKIPPED";
-      
+
       // Show validation status if present
       const validationInfo = result.verification?.validation
         ? result.verification.validation.valid
           ? " (validated)"
           : " (validation failed)"
         : "";
-      
+
       // Show unit test counts
       const unitTestInfo = result.verification
         ? ` [${result.verification.numPassed}/${result.verification.numTests} unit tests]`
         : "";
-      
-      console.log(`${status} ${result.testName}: ${statusText}${validationInfo}${unitTestInfo}`);
+
+      console.log(
+        `${status} ${result.testName}: ${statusText}${validationInfo}${unitTestInfo}`,
+      );
     }
 
     console.log("─".repeat(50));
