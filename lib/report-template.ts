@@ -1,6 +1,10 @@
 import type { TestVerificationResult } from "./output-test-runner.ts";
 import type { ValidationResult } from "./validator-runner.ts";
-import type { MultiTestResultData, SingleTestResult, UnitTestTotals } from "./report.ts";
+import type {
+  MultiTestResultData,
+  SingleTestResult,
+  UnitTestTotals,
+} from "./report.ts";
 import { getReportStyles } from "./report-styles.ts";
 import { formatCost, formatMTokCost } from "./pricing.ts";
 
@@ -99,14 +103,18 @@ function renderContentBlock(block: ContentBlock) {
   return "";
 }
 
-function renderValidationResult(validation: ValidationResult | null | undefined) {
+function renderValidationResult(
+  validation: ValidationResult | null | undefined,
+) {
   if (!validation) {
     return "";
   }
 
   const statusClass = validation.valid ? "passed" : "failed";
   const statusIcon = validation.valid ? "✓" : "✗";
-  const statusText = validation.valid ? "Validation passed" : "Validation failed";
+  const statusText = validation.valid
+    ? "Validation passed"
+    : "Validation failed";
 
   let errorsHtml = "";
   if (validation.errors && validation.errors.length > 0) {
@@ -125,9 +133,7 @@ function renderValidationResult(validation: ValidationResult | null | undefined)
   </div>`;
 }
 
-function renderVerificationResult(
-  verification: TestVerificationResult | null,
-) {
+function renderVerificationResult(verification: TestVerificationResult | null) {
   if (!verification) {
     return `<div class="verification-result skipped">
       <span class="verification-icon">⊘</span>
@@ -547,12 +553,11 @@ function getPricingStyles() {
 
     /* Score badge styles */
     .score-badge {
-      font-size: 13px;
-      padding: 3px 10px;
+      font-size: 15px;
+      padding: 4px 12px;
       border-radius: 4px;
       font-weight: 600;
       font-family: 'JetBrains Mono', monospace;
-      margin-left: auto;
     }
 
     .score-badge.excellent {
@@ -604,13 +609,24 @@ export function generateMultiTestHtml(data: MultiTestResultData) {
   const skippedTests = data.tests.filter((t) => !t.verification).length;
 
   // Calculate unit test totals from metadata or compute them
-  const unitTestTotals: UnitTestTotals = metadata.unitTestTotals ?? (() => {
-    const total = data.tests.reduce((sum, t) => sum + (t.verification?.numTests ?? 0), 0);
-    const passed = data.tests.reduce((sum, t) => sum + (t.verification?.numPassed ?? 0), 0);
-    const failed = data.tests.reduce((sum, t) => sum + (t.verification?.numFailed ?? 0), 0);
-    const score = total > 0 ? Math.round((passed / total) * 100) : 0;
-    return { total, passed, failed, score };
-  })();
+  const unitTestTotals: UnitTestTotals =
+    metadata.unitTestTotals ??
+    (() => {
+      const total = data.tests.reduce(
+        (sum, t) => sum + (t.verification?.numTests ?? 0),
+        0,
+      );
+      const passed = data.tests.reduce(
+        (sum, t) => sum + (t.verification?.numPassed ?? 0),
+        0,
+      );
+      const failed = data.tests.reduce(
+        (sum, t) => sum + (t.verification?.numFailed ?? 0),
+        0,
+      );
+      const score = total > 0 ? Math.round((passed / total) * 100) : 0;
+      return { total, passed, failed, score };
+    })();
 
   const totalTokens = data.tests.reduce(
     (sum, test) =>
@@ -677,13 +693,13 @@ export function generateMultiTestHtml(data: MultiTestResultData) {
       <button class="theme-toggle" onclick="toggleTheme()">◐</button>
     </div>
     <div class="summary-bar">
+      <span class="score-badge ${scoreClass}" title="Score: ${unitTestTotals.passed} passed / ${unitTestTotals.total} total unit tests">${unitTestTotals.score}%</span>
       <div class="summary-group">
         <div class="summary-item passed">✓ ${passedTests} passed</div>
         <div class="summary-item failed">✗ ${failedTests} failed</div>
         ${skippedTests > 0 ? `<div class="summary-item skipped">⊘ ${skippedTests} skipped</div>` : ""}
         <span class="unit-tests-inline">(${unitTestTotals.passed}/${unitTestTotals.total} unit tests)</span>
       </div>
-      <span class="score-badge ${scoreClass}" title="Score: ${unitTestTotals.passed} passed / ${unitTestTotals.total} total unit tests">${unitTestTotals.score}%</span>
     </div>
   </header>
 
