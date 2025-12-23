@@ -553,8 +553,8 @@ function getPricingStyles() {
 
     /* Score badge styles */
     .score-badge {
-      font-size: 15px;
-      padding: 4px 12px;
+      font-size: 18px;
+      padding: 6px 16px;
       border-radius: 4px;
       font-weight: 600;
       font-family: 'JetBrains Mono', monospace;
