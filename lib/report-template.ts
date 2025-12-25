@@ -148,6 +148,9 @@ function renderVerificationResult(verification: TestVerificationResult | null) {
       </div>`
     : "";
 
+  // When validation fails, report 0 passed regardless of actual results
+  const reportedPassed = verification.validationFailed ? 0 : verification.numPassed;
+
   // Determine status class and icon based on validation and test results
   const statusClass = verification.validationFailed
     ? "failed"
@@ -160,7 +163,7 @@ function renderVerificationResult(verification: TestVerificationResult | null) {
       ? "✓"
       : "✗";
   const statusText = verification.validationFailed
-    ? `Validation failed (${verification.numPassed}/${verification.numTests} tests passed)`
+    ? `Validation failed (0/${verification.numTests} tests counted as passed)`
     : verification.passed
       ? "All tests passed"
       : "Tests failed";
@@ -191,7 +194,7 @@ function renderVerificationResult(verification: TestVerificationResult | null) {
     <div class="verification-header">
       <span class="verification-icon">${statusIcon}</span>
       <span class="verification-text">${statusText}</span>
-      <span class="verification-stats">${verification.numPassed}/${verification.numTests} tests (${verification.duration}ms)</span>
+      <span class="verification-stats">${reportedPassed}/${verification.numTests} tests (${verification.duration}ms)</span>
     </div>
     ${errorHtml}
     ${failedTestsHtml}
@@ -253,8 +256,11 @@ function renderTestSection(test: SingleTestResult, index: number) {
 
   const componentId = `component-${test.testName.replace(/[^a-zA-Z0-9]/g, "-")}`;
 
+  // When validation fails, report 0 passed regardless of actual results
   const unitTestInfo = test.verification
-    ? `${test.verification.numPassed}/${test.verification.numTests} unit tests`
+    ? test.verification.validationFailed
+      ? `0/${test.verification.numTests} unit tests (validation failed)`
+      : `${test.verification.numPassed}/${test.verification.numTests} unit tests`
     : "";
 
   const resultWriteHtml = test.resultWriteContent

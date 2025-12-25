@@ -132,6 +132,11 @@ export function calculateScore(passed: number, total: number): number {
   return Math.round((passed / total) * 100);
 }
 
+/**
+ * Calculate unit test totals from test results.
+ * If a test's validation failed, all its unit tests are counted as failed
+ * regardless of actual test results (passed = 0, failed = numTests).
+ */
 export function calculateUnitTestTotals(tests: SingleTestResult[]): UnitTestTotals {
   let total = 0;
   let passed = 0;
@@ -140,8 +145,14 @@ export function calculateUnitTestTotals(tests: SingleTestResult[]): UnitTestTota
   for (const test of tests) {
     if (test.verification) {
       total += test.verification.numTests;
-      passed += test.verification.numPassed;
-      failed += test.verification.numFailed;
+
+      // If validation failed, count all tests as failed regardless of actual results
+      if (test.verification.validationFailed) {
+        failed += test.verification.numTests;
+      } else {
+        passed += test.verification.numPassed;
+        failed += test.verification.numFailed;
+      }
     }
   }
 
