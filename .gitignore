@@ -42,3 +42,6 @@ results/*
 !results/*.json
 .vercel
 .env*.local
+
+# AI benchmark settings (auto-generated)
+.ai-settings.json

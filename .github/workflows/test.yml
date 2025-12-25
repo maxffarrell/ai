@@ -30,5 +30,8 @@ jobs:
       - name: TypeScript type check
         run: bun run tsc
 
-      - name: Run tests
+      - name: Run self-tests
         run: bun test
+
+      - name: Run benchmark tests
+        run: bun run verify-references
