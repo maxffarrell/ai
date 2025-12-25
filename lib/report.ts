@@ -114,12 +114,6 @@ export interface MultiTestResultData {
   metadata: Metadata;
 }
 
-interface LegacyResultData {
-  steps: Step[];
-  resultWriteContent?: string | null;
-  metadata?: Metadata;
-}
-
 /**
  * Calculate the score as a percentage of passed unit tests.
  * Score = (passed / total) * 100, rounded to nearest integer.
@@ -168,34 +162,9 @@ export async function generateReport(
 ) {
   try {
     const jsonContent = await readFile(resultPath, "utf-8");
-    const data = JSON.parse(jsonContent);
+    const data = JSON.parse(jsonContent) as MultiTestResultData;
 
-    let html;
-
-    if ("tests" in data && Array.isArray(data.tests)) {
-      html = generateMultiTestHtml(data as MultiTestResultData);
-    } else {
-      const legacyData = data as LegacyResultData;
-      const multiTestData = {
-        tests: [
-          {
-            testName: "Legacy Test",
-            prompt: "Static prompt (legacy format)",
-            steps: legacyData.steps,
-            resultWriteContent: legacyData.resultWriteContent ?? null,
-            verification: null,
-          },
-        ],
-        metadata: legacyData.metadata ?? {
-          mcpEnabled: false,
-          mcpServerUrl: null,
-          timestamp: new Date().toISOString(),
-          model: "unknown",
-          unitTestTotals: { total: 0, passed: 0, failed: 0, score: 0 },
-        },
-      };
-      html = generateMultiTestHtml(multiTestData);
-    }
+    const html = generateMultiTestHtml(data);
 
     await writeFile(outputPath, html, "utf-8");
 
