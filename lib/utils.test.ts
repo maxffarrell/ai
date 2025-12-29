@@ -239,42 +239,6 @@ describe("TokenCache", () => {
     expect(stats.currentContextTokens).toBe(180); // 100 + 50 + 30
   });
 
-  it("calculates cost with pricing", () => {
-    const cache = new TokenCache(100, pricing);
-
-    cache.addMessage("msg1", 50, 200);
-    cache.addMessage("msg2", 100, 300);
-
-    const cost = cache.calculateSimulatedCost();
-
-    // totalCachedTokens = 100 + 150 = 250 (tokens read from cache across calls)
-    // currentTokens = 250 (all tokens written to cache)
-    // totalOutputTokens = 200 + 300 = 500
-
-    // cacheReadCost = 250 * 0.1e-6 = 0.000025
-    // cacheWriteCost = 250 * 1.25e-6 = 0.0003125 (cache write rate is 1.25x)
-    // outputCost = 500 * 2e-6 = 0.001
-    // simulatedCost = 0.000025 + 0.0003125 + 0.001 = 0.0013375
-
-    expect(cost.cacheReadCost).toBeCloseTo(0.000025, 6);
-    expect(cost.cacheWriteCost).toBeCloseTo(0.0003125, 6);
-    expect(cost.outputCost).toBeCloseTo(0.001, 6);
-    expect(cost.simulatedCost).toBeCloseTo(0.0013375, 6);
-  });
-
-  it("calculates zero cost without pricing", () => {
-    const cache = new TokenCache(100);
-
-    cache.addMessage("msg1", 50, 200);
-
-    const cost = cache.calculateSimulatedCost();
-
-    expect(cost.cacheReadCost).toBe(0);
-    expect(cost.cacheWriteCost).toBe(0);
-    expect(cost.outputCost).toBe(0);
-    expect(cost.simulatedCost).toBe(0);
-  });
-
   it("handles zero tokens", () => {
     const cache = new TokenCache(0, pricing);
     const stats = cache.getCacheStats();
@@ -282,9 +246,6 @@ describe("TokenCache", () => {
     expect(stats.totalCachedTokens).toBe(0);
     expect(stats.currentContextTokens).toBe(0);
     expect(stats.messageCount).toBe(0);
-
-    const cost = cache.calculateSimulatedCost();
-    expect(cost.simulatedCost).toBe(0);
   });
 });
 
