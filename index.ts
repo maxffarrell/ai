@@ -679,7 +679,7 @@ async function main() {
         cacheCreationCostPerMTok: pricingDisplay.cacheCreationCostPerMTok,
       };
 
-      console.log("\n💰 Cost Summary");
+      console.log("\n💵 Cost Summary (No Caching)");
       console.log("─".repeat(50));
       console.log(
         `Input tokens: ${totalCost.inputTokens.toLocaleString()} (${formatCost(totalCost.inputCost)})`,
@@ -687,45 +687,45 @@ async function main() {
       console.log(
         `Output tokens: ${totalCost.outputTokens.toLocaleString()} (${formatCost(totalCost.outputCost)})`,
       );
-      if (totalCost.cachedInputTokens > 0) {
-        console.log(
-          `Cached tokens: ${totalCost.cachedInputTokens.toLocaleString()}`,
-        );
-      }
       console.log(`Total cost: ${formatCost(totalCost.totalCost)}`);
 
-      // Simulate cache savings
-      cacheSimulation = simulateCacheSavings(
-        testResults,
-        pricingLookup.pricing,
-      );
+      // Simulate cache savings if cache pricing is available
       if (
-        cacheSimulation.cacheHits > 0 ||
-        cacheSimulation.cacheWriteTokens > 0
+        pricingLookup.pricing.cacheReadInputTokenCost !== undefined &&
+        pricingLookup.pricing.cacheCreationInputTokenCost !== undefined
       ) {
-        console.log("\n📊 Cache Simulation (estimated with prompt caching):");
-        console.log("─".repeat(50));
-        const totalCacheTokens =
-          cacheSimulation.cacheHits + cacheSimulation.cacheWriteTokens;
-        console.log(
-          `Cache reads: ${cacheSimulation.cacheHits.toLocaleString()} tokens`,
+        cacheSimulation = simulateCacheSavings(
+          testResults,
+          pricingLookup.pricing,
         );
-        console.log(
-          `Cache writes: ${cacheSimulation.cacheWriteTokens.toLocaleString()} tokens`,
-        );
-        console.log(
-          `Total input tokens: ${totalCacheTokens.toLocaleString()} (reads + writes)`,
-        );
-        console.log(
-          `Estimated cost with cache: ${formatCost(cacheSimulation.simulatedCostWithCache)}`,
-        );
-        const savings =
-          totalCost.totalCost - cacheSimulation.simulatedCostWithCache;
-        const savingsPercent = (savings / totalCost.totalCost) * 100;
-        if (savings > 0) {
+
+        if (
+          cacheSimulation.cacheHits > 0 ||
+          cacheSimulation.cacheWriteTokens > 0
+        ) {
+          console.log("\n📊 Simulated Cost (With Caching)");
+          console.log("─".repeat(50));
           console.log(
-            `Potential savings: ${formatCost(savings)} (${savingsPercent.toFixed(1)}%)`,
+            `Cache reads: ${cacheSimulation.cacheHits.toLocaleString()} tokens`,
           );
+          console.log(
+            `Cache writes: ${cacheSimulation.cacheWriteTokens.toLocaleString()} tokens`,
+          );
+          console.log(
+            `Output tokens: ${cacheSimulation.outputTokens.toLocaleString()}`,
+          );
+          console.log(
+            `Simulated total: ${formatCost(cacheSimulation.simulatedCostWithCache)}`,
+          );
+
+          const savings =
+            totalCost.totalCost - cacheSimulation.simulatedCostWithCache;
+          const savingsPercent = (savings / totalCost.totalCost) * 100;
+          if (savings > 0) {
+            console.log(
+              `Potential savings: ${formatCost(savings)} (${savingsPercent.toFixed(1)}%)`,
+            );
+          }
         }
       }
     }

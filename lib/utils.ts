@@ -55,19 +55,22 @@ export function extractResultWriteContent(steps: unknown[]) {
   return null;
 }
 
+/**
+ * Calculate the total cost WITHOUT any caching.
+ * This represents the actual cost when running tests without prompt caching enabled.
+ * All input tokens are charged at the full input rate.
+ */
 export function calculateTotalCost(
   tests: SingleTestResult[],
   pricing: NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>,
-) {
+): TotalCostInfo {
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  let totalCachedInputTokens = 0;
 
   for (const test of tests) {
     for (const step of test.steps) {
       totalInputTokens += step.usage.inputTokens;
       totalOutputTokens += step.usage.outputTokens;
-      totalCachedInputTokens += step.usage.cachedInputTokens ?? 0;
     }
   }
 
@@ -77,19 +80,12 @@ export function calculateTotalCost(
     totalOutputTokens,
   );
 
-  // Calculate cache read cost
-  const cacheReadCost = pricing.cacheReadInputTokenCost !== undefined
-    ? totalCachedInputTokens * pricing.cacheReadInputTokenCost
-    : 0;
-
   return {
     inputCost: costResult.inputCost,
     outputCost: costResult.outputCost,
-    cacheReadCost,
-    totalCost: costResult.totalCost + cacheReadCost,
+    totalCost: costResult.totalCost,
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
-    cachedInputTokens: totalCachedInputTokens,
   };
 }
 
@@ -112,6 +108,20 @@ IMPORTANT: When you have finished implementing the component, use the ResultWrit
   ];
 }
 
+export interface CacheSimulationResult {
+  /** The simulated total cost with caching enabled */
+  simulatedCostWithCache: number;
+  /** Breakdown of the simulated cost */
+  simulatedInputCost: number;
+  simulatedOutputCost: number;
+  /** Total tokens read from cache (at reduced rate) */
+  cacheHits: number;
+  /** Total tokens written to cache (at cache creation rate) */
+  cacheWriteTokens: number;
+  /** Total output tokens (unchanged from non-cached) */
+  outputTokens: number;
+}
+
 /**
  * Simulates cache savings using a growing prefix model.
  *
@@ -131,7 +141,7 @@ IMPORTANT: When you have finished implementing the component, use the ResultWrit
 export function simulateCacheSavings(
   tests: SingleTestResult[],
   pricing: NonNullable<ReturnType<typeof extractPricingFromGatewayModel>>,
-) {
+): CacheSimulationResult {
   if (
     pricing.cacheReadInputTokenCost === undefined ||
     pricing.cacheCreationInputTokenCost === undefined
@@ -145,7 +155,9 @@ export function simulateCacheSavings(
 
   let totalCacheHits = 0; // Total tokens read from cache across all steps
   let totalCacheWriteTokens = 0; // Total tokens written to cache (including step 1)
-  let simulatedCost = 0;
+  let totalOutputTokens = 0;
+  let simulatedInputCost = 0;
+  let simulatedOutputCost = 0;
 
   for (const test of tests) {
     if (test.steps.length === 0) continue;
@@ -156,10 +168,11 @@ export function simulateCacheSavings(
     // Create cache with first step's input tokens
     const cache = new TokenCache(firstStep.usage.inputTokens, pricing);
     totalCacheWriteTokens += firstStep.usage.inputTokens;
+    totalOutputTokens += firstStep.usage.outputTokens;
 
     // First step: pay cache creation rate for all input
-    simulatedCost += firstStep.usage.inputTokens * cacheWriteRate;
-    simulatedCost += firstStep.usage.outputTokens * pricing.outputCostPerToken;
+    simulatedInputCost += firstStep.usage.inputTokens * cacheWriteRate;
+    simulatedOutputCost += firstStep.usage.outputTokens * pricing.outputCostPerToken;
 
     // Add output tokens for first step (but no new input tokens yet)
     cache.addMessage("step-0", 0, firstStep.usage.outputTokens);
@@ -175,20 +188,24 @@ export function simulateCacheSavings(
 
       totalCacheHits += cachedPortion;
       totalCacheWriteTokens += newTokens;
+      totalOutputTokens += step.usage.outputTokens;
 
       // Calculate cost for this step
-      simulatedCost += cachedPortion * cacheReadRate;
-      simulatedCost += newTokens * cacheWriteRate;
-      simulatedCost += step.usage.outputTokens * pricing.outputCostPerToken;
+      simulatedInputCost += cachedPortion * cacheReadRate;
+      simulatedInputCost += newTokens * cacheWriteRate;
+      simulatedOutputCost += step.usage.outputTokens * pricing.outputCostPerToken;
 
       cache.addMessage(`step-${i}`, newTokens, step.usage.outputTokens);
     }
   }
 
   return {
-    simulatedCostWithCache: simulatedCost,
+    simulatedCostWithCache: simulatedInputCost + simulatedOutputCost,
+    simulatedInputCost,
+    simulatedOutputCost,
     cacheHits: totalCacheHits,
     cacheWriteTokens: totalCacheWriteTokens,
+    outputTokens: totalOutputTokens,
   };
 }
 

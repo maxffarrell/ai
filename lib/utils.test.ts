@@ -121,15 +121,13 @@ describe("calculateTotalCost", () => {
     expect(result).toEqual({
       inputCost: 0,
       outputCost: 0,
-      cacheReadCost: 0,
       totalCost: 0,
       inputTokens: 0,
       outputTokens: 0,
-      cachedInputTokens: 0,
     });
   });
 
-  it("aggregates usage from multiple steps and tests", () => {
+  it("aggregates usage from multiple steps and tests without cache considerations", () => {
     const tests: SingleTestResult[] = [
       {
         testName: "test1",
@@ -141,7 +139,7 @@ describe("calculateTotalCost", () => {
             usage: {
               inputTokens: 100,
               outputTokens: 50,
-              cachedInputTokens: 10,
+              cachedInputTokens: 10, // Should be ignored
             },
           } as any,
           {
@@ -163,7 +161,7 @@ describe("calculateTotalCost", () => {
             usage: {
               inputTokens: 300,
               outputTokens: 150,
-              cachedInputTokens: 20,
+              cachedInputTokens: 20, // Should be ignored
             },
           } as any,
         ],
@@ -172,23 +170,47 @@ describe("calculateTotalCost", () => {
 
     // Total Input: 100 + 200 + 300 = 600
     // Total Output: 50 + 100 + 150 = 300
-    // Total Cached: 10 + 0 + 20 = 30
+    // Note: cachedInputTokens is ignored for non-cached cost calculation
 
     // Costs (per Token):
     // Input: 600 * (1.0 / 1e6) = 0.0006
     // Output: 300 * (2.0 / 1e6) = 0.0006
-    // Cache read: 30 * (0.1 / 1e6) = 0.000003
-    // Total: 0.0006 + 0.0006 + 0.000003 = 0.001203
+    // Total: 0.0006 + 0.0006 = 0.0012
 
     const result = calculateTotalCost(tests, pricing);
 
     expect(result.inputCost).toBe(0.0006);
     expect(result.outputCost).toBe(0.0006);
-    expect(result.cacheReadCost).toBe(0.000003);
-    expect(result.totalCost).toBeCloseTo(0.001203, 6);
+    expect(result.totalCost).toBeCloseTo(0.0012, 6);
     expect(result.inputTokens).toBe(600);
     expect(result.outputTokens).toBe(300);
-    expect(result.cachedInputTokens).toBe(30);
+  });
+
+  it("ignores cachedInputTokens field entirely", () => {
+    const tests: SingleTestResult[] = [
+      {
+        testName: "test1",
+        prompt: "p1",
+        resultWriteContent: null,
+        verification: {} as any,
+        steps: [
+          {
+            usage: {
+              inputTokens: 1000,
+              outputTokens: 500,
+              cachedInputTokens: 800, // Even with high cached count, all input charged at full rate
+            },
+          } as any,
+        ],
+      },
+    ];
+
+    const result = calculateTotalCost(tests, pricing);
+
+    // All 1000 input tokens charged at full rate (no cache discount)
+    expect(result.inputCost).toBe(0.001); // 1000 * 1e-6
+    expect(result.outputCost).toBe(0.001); // 500 * 2e-6
+    expect(result.totalCost).toBe(0.002);
   });
 });
 
@@ -269,8 +291,11 @@ describe("simulateCacheSavings - growing prefix model", () => {
 
     expect(result).toEqual({
       simulatedCostWithCache: 0,
+      simulatedInputCost: 0,
+      simulatedOutputCost: 0,
       cacheHits: 0,
       cacheWriteTokens: 0,
+      outputTokens: 0,
     });
   });
 
@@ -296,9 +321,14 @@ describe("simulateCacheSavings - growing prefix model", () => {
     const result = simulateCacheSavings(tests, basicPricing);
 
     // Step 1: 1000 input tokens at cache write rate (1.25/MTok) + 500 output at $2/MTok
-    // Simulated cost = 1000 * 1.25e-6 + 500 * 2e-6 = 0.00125 + 0.001 = 0.00225
+    // Simulated input cost = 1000 * 1.25e-6 = 0.00125
+    // Simulated output cost = 500 * 2e-6 = 0.001
+    // Simulated total = 0.00125 + 0.001 = 0.00225
     expect(result.cacheHits).toBe(0);
     expect(result.cacheWriteTokens).toBe(1000);
+    expect(result.outputTokens).toBe(500);
+    expect(result.simulatedInputCost).toBeCloseTo(0.00125, 6);
+    expect(result.simulatedOutputCost).toBeCloseTo(0.001, 6);
     expect(result.simulatedCostWithCache).toBeCloseTo(0.00225, 6);
   });
 
@@ -339,15 +369,21 @@ describe("simulateCacheSavings - growing prefix model", () => {
 
     // Growing prefix model:
     // Step 1: 1000 tokens → write all to cache
-    //   Cost: 1000 * 1.25e-6 + 200 * 2e-6 = 0.00125 + 0.0004 = 0.00165
+    //   Input cost: 1000 * 1.25e-6 = 0.00125
+    //   Output cost: 200 * 2e-6 = 0.0004
     // Step 2: 1500 tokens → 1000 cached (read), 500 new (write)
-    //   Cost: 1000 * 0.1e-6 + 500 * 1.25e-6 + 300 * 2e-6 = 0.0001 + 0.000625 + 0.0006 = 0.001325
+    //   Input cost: 1000 * 0.1e-6 + 500 * 1.25e-6 = 0.0001 + 0.000625 = 0.000725
+    //   Output cost: 300 * 2e-6 = 0.0006
     // Step 3: 2000 tokens → 1500 cached (read), 500 new (write)
-    //   Cost: 1500 * 0.1e-6 + 500 * 1.25e-6 + 400 * 2e-6 = 0.00015 + 0.000625 + 0.0008 = 0.001575
-    // Total simulated: 0.00165 + 0.001325 + 0.001575 = 0.00455
+    //   Input cost: 1500 * 0.1e-6 + 500 * 1.25e-6 = 0.00015 + 0.000625 = 0.000775
+    //   Output cost: 400 * 2e-6 = 0.0008
+    // Total input: 0.00125 + 0.000725 + 0.000775 = 0.00275
+    // Total output: 0.0004 + 0.0006 + 0.0008 = 0.0018
+    // Total simulated: 0.00275 + 0.0018 = 0.00455
 
     expect(result.cacheHits).toBe(1000 + 1500); // 1000 from step 2 + 1500 from step 3
     expect(result.cacheWriteTokens).toBe(1000 + 500 + 500); // 1000 step1 + 500 step2 + 500 step3
+    expect(result.outputTokens).toBe(200 + 300 + 400);
     expect(result.simulatedCostWithCache).toBeCloseTo(0.00455, 6);
   });
 
@@ -423,6 +459,7 @@ describe("simulateCacheSavings - growing prefix model", () => {
 
     expect(result.cacheHits).toBe(2000);
     expect(result.cacheWriteTokens).toBe(2000);
+    expect(result.outputTokens).toBe(100 + 100 + 200 + 200 + 200);
 
     // Calculate expected cost manually:
     // Test 1 Step 1: 500 * 1.25e-6 + 100 * 2e-6 = 0.000625 + 0.0002 = 0.000825
@@ -466,6 +503,7 @@ describe("simulateCacheSavings - growing prefix model", () => {
     // Only test2 should be counted
     expect(result.cacheHits).toBe(0);
     expect(result.cacheWriteTokens).toBe(1000);
+    expect(result.outputTokens).toBe(500);
   });
 
   it("uses custom cache pricing when provided", () => {
@@ -511,6 +549,7 @@ describe("simulateCacheSavings - growing prefix model", () => {
 
     expect(result.cacheHits).toBe(1000);
     expect(result.cacheWriteTokens).toBe(1000 + 500);
+    expect(result.outputTokens).toBe(500 + 500);
     expect(result.simulatedCostWithCache).toBeCloseTo(0.0043, 6);
   });
 
@@ -574,6 +613,7 @@ describe("simulateCacheSavings - growing prefix model", () => {
     expect(result.simulatedCostWithCache).toBe(0);
     expect(result.cacheHits).toBe(0);
     expect(result.cacheWriteTokens).toBe(0);
+    expect(result.outputTokens).toBe(0);
   });
 
   it("compares favorably to actual cost for multi-step tests", () => {
@@ -764,8 +804,8 @@ describe("buildAgentPrompt", () => {
     expect(content).toContain('test("displays hello world", () => {');
 
     // Must be in a code block
-    expect(content).toContain("```ts");
-    expect(content).toMatch(/```ts[\s\S]*import { expect, test } from "vitest";/);
+    expect(content).toContain("\`\`\`ts");
+    expect(content).toMatch(/\`\`\`ts[\s\S]*import { expect, test } from "vitest";/);
   });
 
   it("includes instructions about ResultWrite tool", () => {

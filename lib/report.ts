@@ -74,14 +74,16 @@ export interface PricingInfo {
   cacheCreationCostPerMTok?: number;
 }
 
+/**
+ * Cost information calculated WITHOUT caching.
+ * This represents the actual cost when running tests without prompt caching.
+ */
 export interface TotalCostInfo {
   inputCost: number;
   outputCost: number;
-  cacheReadCost: number;
   totalCost: number;
   inputTokens: number;
   outputTokens: number;
-  cachedInputTokens: number;
 }
 
 export interface UnitTestTotals {
