@@ -93,6 +93,14 @@ export function buildAgentPrompt(test: TestDefinition): ModelMessage[] {
       role: "user",
       content: `${test.prompt}
 
+## Test Suite
+
+Your component must pass the following tests:
+
+\`\`\`ts
+${test.testContent}
+\`\`\`
+
 IMPORTANT: When you have finished implementing the component, use the ResultWrite tool to output your final Svelte component code. Only output the component code itself, no explanations or markdown formatting.`,
     },
   ];
