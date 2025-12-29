@@ -29,7 +29,6 @@ import {
   lookupPricingFromMap,
   getModelPricingDisplay,
   formatCost,
-  formatMTokCost,
   formatFullPricingDisplay,
 } from "./lib/pricing.ts";
 import type { LanguageModel } from "ai";
@@ -429,9 +428,12 @@ async function runSingleTest(
     cleanupTestEnvironment(test.name);
 
     const promptContent = messages[0]?.content;
+    if (!promptContent) {
+      throw new Error("Failed to extract prompt content from messages");
+    }
     const promptStr = typeof promptContent === "string"
       ? promptContent
-      : promptContent?.toString() ?? "";
+      : promptContent.toString();
 
     return {
       testName: test.name,
@@ -443,9 +445,11 @@ async function runSingleTest(
   } catch (error) {
     console.error(`  ✗ Error running test: ${error}`);
     const promptContent = messages[0]?.content;
-    const promptStr = typeof promptContent === "string"
-      ? promptContent
-      : promptContent?.toString() ?? "";
+    const promptStr = promptContent
+      ? (typeof promptContent === "string"
+        ? promptContent
+        : promptContent.toString())
+      : "Failed: Unable to extract prompt content";
     return {
       testName: test.name,
       prompt: promptStr,
