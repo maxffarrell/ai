@@ -311,7 +311,7 @@ function renderTestSection(test: SingleTestResult, index: number) {
 
 function renderPricingSection(data: MultiTestResultData) {
   const { metadata } = data;
-  const { pricing, totalCost, pricingKey } = metadata;
+  const { pricing, totalCost, cacheSimulation, pricingKey } = metadata;
 
   if (!pricing && !totalCost) {
     return "";
@@ -323,6 +323,16 @@ function renderPricingSection(data: MultiTestResultData) {
       ? `<span class="pricing-key" title="Key matched in model-pricing.json">${escapeHtml(pricingKey)}</span>`
       : "";
 
+    const cacheReadText =
+      pricing.cacheReadCostPerMTok !== undefined
+        ? `<span class="rate-separator">·</span><span class="rate-value">${formatMTokCost(pricing.cacheReadCostPerMTok)}/MTok cache read</span>`
+        : "";
+
+    const cacheWriteText =
+      pricing.cacheCreationCostPerMTok !== undefined
+        ? `<span class="rate-separator">·</span><span class="rate-value">${formatMTokCost(pricing.cacheCreationCostPerMTok)}/MTok cache write</span>`
+        : "";
+
     pricingInfoHtml = `
       <div class="pricing-rates">
         <span class="rate-label">Model Pricing:</span>
@@ -330,46 +340,81 @@ function renderPricingSection(data: MultiTestResultData) {
         <span class="rate-value">${formatMTokCost(pricing.inputCostPerMTok)}/MTok in</span>
         <span class="rate-separator">·</span>
         <span class="rate-value">${formatMTokCost(pricing.outputCostPerMTok)}/MTok out</span>
-        ${pricing.cacheReadCostPerMTok !== undefined ? `<span class="rate-separator">·</span><span class="rate-value">${formatMTokCost(pricing.cacheReadCostPerMTok)}/MTok cached</span>` : ""}
+        ${cacheReadText}
+        ${cacheWriteText}
       </div>
     `;
   }
 
-  let costBreakdownHtml = "";
+  let nonCachedCostHtml = "";
   if (totalCost) {
-    const uncachedInputTokens =
-      totalCost.inputTokens - totalCost.cachedInputTokens;
-
-    costBreakdownHtml = `
-      <div class="cost-breakdown">
-        <div class="cost-row">
-          <span class="cost-label">Input tokens:</span>
-          <span class="cost-tokens">${uncachedInputTokens.toLocaleString()}</span>
-          <span class="cost-value">${formatCost(totalCost.inputCost)}</span>
-        </div>
-        <div class="cost-row">
-          <span class="cost-label">Output tokens:</span>
-          <span class="cost-tokens">${totalCost.outputTokens.toLocaleString()}</span>
-          <span class="cost-value">${formatCost(totalCost.outputCost)}</span>
-        </div>
-        ${
-          totalCost.cachedInputTokens > 0
-            ? `
-        <div class="cost-row cached">
-          <span class="cost-label">Cached tokens:</span>
-          <span class="cost-tokens">${totalCost.cachedInputTokens.toLocaleString()} ⚡</span>
-          <span class="cost-value">${formatCost(totalCost.cacheReadCost)}</span>
-        </div>
-        `
-            : ""
-        }
-        <div class="cost-row total">
-          <span class="cost-label">Total Cost:</span>
-          <span class="cost-tokens"></span>
-          <span class="cost-value">${formatCost(totalCost.totalCost)}</span>
+    nonCachedCostHtml = `
+      <div class="cost-section">
+        <h5 class="cost-section-title">💵 Cost</h5>
+        <div class="cost-breakdown">
+          <div class="cost-row">
+            <span class="cost-label">Input:</span>
+            <span class="cost-tokens">${totalCost.inputTokens.toLocaleString()}</span>
+            <span class="cost-value">${formatCost(totalCost.inputCost)}</span>
+          </div>
+          <div class="cost-row">
+            <span class="cost-label">Output:</span>
+            <span class="cost-tokens">${totalCost.outputTokens.toLocaleString()}</span>
+            <span class="cost-value">${formatCost(totalCost.outputCost)}</span>
+          </div>
+          <div class="cost-row total">
+            <span class="cost-label">Total:</span>
+            <span class="cost-tokens"></span>
+            <span class="cost-value">${formatCost(totalCost.totalCost)}</span>
+          </div>
         </div>
       </div>
     `;
+  }
+
+  let cachedCostHtml = "";
+  if (cacheSimulation && pricing?.cacheReadCostPerMTok !== undefined && pricing?.cacheCreationCostPerMTok !== undefined) {
+    const hasCacheActivity = cacheSimulation.cacheHits > 0 || cacheSimulation.cacheWriteTokens > 0;
+    
+    if (hasCacheActivity && totalCost) {
+      const savings = totalCost.totalCost - cacheSimulation.simulatedCostWithCache;
+      const savingsPercent = totalCost.totalCost > 0 
+        ? ((savings / totalCost.totalCost) * 100).toFixed(0)
+        : "0";
+      const savingsClass = savings > 0 ? "savings-positive" : "savings-negative";
+      const savingsSign = savings >= 0 ? "+" : "";
+
+      cachedCostHtml = `
+        <div class="cost-section cached-section">
+          <h5 class="cost-section-title">📊 Cost with prompt caching</h5>
+          <div class="cost-breakdown">
+            <div class="cost-row">
+              <span class="cost-label">Cache reads:</span>
+              <span class="cost-tokens">${cacheSimulation.cacheHits.toLocaleString()}</span>
+              <span class="cost-value dim">${formatMTokCost(pricing.cacheReadCostPerMTok)}/MTok</span>
+            </div>
+            <div class="cost-row">
+              <span class="cost-label">Cache writes:</span>
+              <span class="cost-tokens">${cacheSimulation.cacheWriteTokens.toLocaleString()}</span>
+              <span class="cost-value dim">${formatMTokCost(pricing.cacheCreationCostPerMTok)}/MTok</span>
+            </div>
+            <div class="cost-row">
+              <span class="cost-label">Output:</span>
+              <span class="cost-tokens">${cacheSimulation.outputTokens.toLocaleString()}</span>
+              <span class="cost-value">${formatCost(cacheSimulation.simulatedOutputCost)}</span>
+            </div>
+            <div class="cost-row total">
+              <span class="cost-label">Total:</span>
+              <span class="cost-tokens"></span>
+              <span class="cost-value-with-savings">
+                ${formatCost(cacheSimulation.simulatedCostWithCache)}
+                <span class="savings-badge ${savingsClass}">${savingsSign}${savingsPercent}%</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
   }
 
   return `
@@ -379,7 +424,10 @@ function renderPricingSection(data: MultiTestResultData) {
         <span class="pricing-title">Cost Summary</span>
       </div>
       ${pricingInfoHtml}
-      ${costBreakdownHtml}
+      <div class="cost-sections-container">
+        ${nonCachedCostHtml}
+        ${cachedCostHtml}
+      </div>
     </div>
   `;
 }
@@ -451,27 +499,48 @@ function getPricingStyles() {
       color: var(--border);
     }
 
+    .cost-sections-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .cost-section {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px;
+    }
+
+    .cost-section.cached-section {
+      border-color: var(--mcp-enabled);
+      border-style: dashed;
+    }
+
+    .cost-section-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+      color: var(--text);
+    }
+
     .cost-breakdown {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
     }
 
     .cost-row {
       display: grid;
-      grid-template-columns: 120px 1fr auto;
-      gap: 8px;
+      grid-template-columns: 90px 1fr auto;
+      gap: 6px;
       align-items: center;
-      font-size: 13px;
-    }
-
-    .cost-row.cached {
-      color: var(--text-muted);
+      font-size: 12px;
     }
 
     .cost-row.total {
-      margin-top: 8px;
-      padding-top: 8px;
+      margin-top: 6px;
+      padding-top: 6px;
       border-top: 1px solid var(--border);
       font-weight: 600;
     }
@@ -487,18 +556,54 @@ function getPricingStyles() {
     .cost-tokens {
       font-family: 'JetBrains Mono', monospace;
       text-align: right;
+      font-size: 11px;
     }
 
     .cost-value {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 500;
       text-align: right;
-      min-width: 80px;
+      min-width: 60px;
+    }
+
+    .cost-value.dim {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: normal;
     }
 
     .cost-row.total .cost-value {
-      color: var(--success);
-      font-size: 15px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .cost-value-with-savings {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      text-align: right;
+      min-width: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .savings-badge {
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .savings-badge.savings-positive {
+      background: var(--success);
+      color: white;
+    }
+
+    .savings-badge.savings-negative {
+      background: var(--error);
+      color: white;
     }
 
     /* Validation styles */

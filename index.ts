@@ -13,12 +13,10 @@ import {
   extractResultWriteContent,
   calculateTotalCost,
   withRetry,
-} from "./lib/utils.ts";
-import {
-  discoverTests,
   buildAgentPrompt,
-  type TestDefinition,
-} from "./lib/test-discovery.ts";
+  simulateCacheSavings,
+} from "./lib/utils.ts";
+import { discoverTests, type TestDefinition } from "./lib/test-discovery.ts";
 import {
   setupOutputsDirectory,
   cleanupOutputsDirectory,
@@ -31,9 +29,7 @@ import {
   lookupPricingFromMap,
   getModelPricingDisplay,
   formatCost,
-  formatMTokCost,
-  type ModelPricingLookup,
-  type GatewayModel,
+  formatFullPricingDisplay,
 } from "./lib/pricing.ts";
 import type { LanguageModel } from "ai";
 import {
@@ -80,10 +76,10 @@ function saveSettings(settings: SavedSettings): void {
 
 async function validateAndConfirmPricing(
   models: string[],
-  pricingMap: Map<string, ModelPricingLookup | null>,
+  pricingMap: ReturnType<typeof buildPricingMap>,
   savedPricingEnabled?: boolean,
 ) {
-  const lookups = new Map<string, ModelPricingLookup | null>();
+  const lookups = new Map<string, ReturnType<typeof lookupPricingFromMap>>();
 
   for (const modelId of models) {
     const lookup = lookupPricingFromMap(modelId, pricingMap);
@@ -97,7 +93,7 @@ async function validateAndConfirmPricing(
     const pricingLines = models.map((modelId) => {
       const lookup = lookups.get(modelId)!;
       const display = getModelPricingDisplay(lookup.pricing);
-      return `${modelId}\n  → ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out`;
+      return `${modelId}\n  → ${formatFullPricingDisplay(display)}`;
     });
 
     note(pricingLines.join("\n\n"), "💰 Pricing Found");
@@ -129,9 +125,7 @@ async function validateAndConfirmPricing(
       for (const modelId of modelsWithPricing) {
         const lookup = lookups.get(modelId)!;
         const display = getModelPricingDisplay(lookup.pricing);
-        lines.push(
-          `  ✓ ${modelId} (${formatMTokCost(display.inputCostPerMTok)}/MTok in)`,
-        );
+        lines.push(`  ✓ ${modelId} (${formatFullPricingDisplay(display)})`);
       }
     }
 
@@ -164,8 +158,7 @@ async function selectOptions() {
 
   const availableModels = await gateway.getAvailableModels();
 
-  const gatewayModels = availableModels.models as GatewayModel[];
-  const pricingMap = buildPricingMap(gatewayModels);
+  const pricingMap = buildPricingMap(availableModels.models);
 
   const modelOptions = [{ value: "custom", label: "Custom" }].concat(
     availableModels.models.reduce<Array<{ value: string; label: string }>>(
@@ -321,7 +314,7 @@ async function runSingleTest(
   console.log(`\n[${testIndex + 1}/${totalTests}] Running test: ${test.name}`);
   console.log("─".repeat(50));
 
-  const fullPrompt = buildAgentPrompt(test);
+  const messages = buildAgentPrompt(test);
 
   try {
     const tools = {
@@ -376,7 +369,7 @@ async function runSingleTest(
     }
 
     const result = await withRetry(
-      async () => agent.generate({ prompt: fullPrompt }),
+      async () => agent.generate({ messages }),
       {
         retries: 10,
         minTimeout: 1000,
@@ -388,12 +381,27 @@ async function runSingleTest(
 
     if (!resultWriteContent) {
       console.log("  ⚠️  No ResultWrite output found");
+      const promptContent = messages[0]?.content;
+      const promptStr = promptContent
+        ? (typeof promptContent === "string"
+          ? promptContent
+          : promptContent.toString())
+        : "";
+
       return {
         testName: test.name,
-        prompt: fullPrompt,
+        prompt: promptStr,
         steps: result.steps as unknown as SingleTestResult["steps"],
         resultWriteContent: null,
-        verification: null,
+        verification: {
+          testName: test.name,
+          passed: false,
+          numTests: 0,
+          numPassed: 0,
+          numFailed: 0,
+          duration: 0,
+          error: "Agent did not produce output (no ResultWrite tool call)",
+        },
       };
     }
 
@@ -434,18 +442,32 @@ async function runSingleTest(
 
     cleanupTestEnvironment(test.name);
 
+    const promptContent = messages[0]?.content;
+    if (!promptContent) {
+      throw new Error("Failed to extract prompt content from messages");
+    }
+    const promptStr = typeof promptContent === "string"
+      ? promptContent
+      : promptContent.toString();
+
     return {
       testName: test.name,
-      prompt: fullPrompt,
+      prompt: promptStr,
       steps: result.steps as unknown as SingleTestResult["steps"],
       resultWriteContent,
       verification,
     };
   } catch (error) {
     console.error(`  ✗ Error running test: ${error}`);
+    const promptContent = messages[0]?.content;
+    const promptStr = promptContent
+      ? (typeof promptContent === "string"
+        ? promptContent
+        : promptContent.toString())
+      : "Failed: Unable to extract prompt content";
     return {
       testName: test.name,
-      prompt: fullPrompt,
+      prompt: promptStr,
       steps: [],
       resultWriteContent: null,
       verification: {
@@ -482,9 +504,7 @@ async function main() {
     if (pricing.enabled && lookup) {
       const display = getModelPricingDisplay(lookup.pricing);
       console.log(`   ${modelId}`);
-      console.log(
-        `      💰 ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out`,
-      );
+      console.log(`      💰 ${formatFullPricingDisplay(display)}`);
     } else {
       console.log(`   ${modelId}`);
     }
@@ -552,9 +572,7 @@ async function main() {
 
     if (pricingLookup) {
       const display = getModelPricingDisplay(pricingLookup.pricing);
-      console.log(
-        `💰 Pricing: ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out`,
-      );
+      console.log(`💰 Pricing: ${formatFullPricingDisplay(display)}`);
     }
 
     const model = gateway.languageModel(modelId);
@@ -627,6 +645,7 @@ async function main() {
 
     let totalCost = null;
     let pricingInfo = null;
+    let cacheSimulation = null;
 
     if (pricingLookup) {
       totalCost = calculateTotalCost(testResults, pricingLookup.pricing);
@@ -635,9 +654,10 @@ async function main() {
         inputCostPerMTok: pricingDisplay.inputCostPerMTok,
         outputCostPerMTok: pricingDisplay.outputCostPerMTok,
         cacheReadCostPerMTok: pricingDisplay.cacheReadCostPerMTok,
+        cacheCreationCostPerMTok: pricingDisplay.cacheCreationCostPerMTok,
       };
 
-      console.log("\n💰 Cost Summary");
+      console.log("\n💵 Cost Summary (No Caching)");
       console.log("─".repeat(50));
       console.log(
         `Input tokens: ${totalCost.inputTokens.toLocaleString()} (${formatCost(totalCost.inputCost)})`,
@@ -645,12 +665,47 @@ async function main() {
       console.log(
         `Output tokens: ${totalCost.outputTokens.toLocaleString()} (${formatCost(totalCost.outputCost)})`,
       );
-      if (totalCost.cachedInputTokens > 0) {
-        console.log(
-          `Cached tokens: ${totalCost.cachedInputTokens.toLocaleString()} (${formatCost(totalCost.cacheReadCost)})`,
-        );
-      }
       console.log(`Total cost: ${formatCost(totalCost.totalCost)}`);
+
+      // Simulate cache savings if cache pricing is available
+      if (
+        pricingLookup.pricing.cacheReadInputTokenCost !== undefined &&
+        pricingLookup.pricing.cacheCreationInputTokenCost !== undefined
+      ) {
+        cacheSimulation = simulateCacheSavings(
+          testResults,
+          pricingLookup.pricing,
+        );
+
+        if (
+          cacheSimulation.cacheHits > 0 ||
+          cacheSimulation.cacheWriteTokens > 0
+        ) {
+          console.log("\n📊 Simulated Cost (With Caching)");
+          console.log("─".repeat(50));
+          console.log(
+            `Cache reads: ${cacheSimulation.cacheHits.toLocaleString()} tokens`,
+          );
+          console.log(
+            `Cache writes: ${cacheSimulation.cacheWriteTokens.toLocaleString()} tokens`,
+          );
+          console.log(
+            `Output tokens: ${cacheSimulation.outputTokens.toLocaleString()}`,
+          );
+          console.log(
+            `Simulated total: ${formatCost(cacheSimulation.simulatedCostWithCache)}`,
+          );
+
+          const savings =
+            totalCost.totalCost - cacheSimulation.simulatedCostWithCache;
+          const savingsPercent = (savings / totalCost.totalCost) * 100;
+          if (savings > 0) {
+            console.log(
+              `Potential savings: ${formatCost(savings)} (${savingsPercent.toFixed(1)}%)`,
+            );
+          }
+        }
+      }
     }
 
     const resultsDir = "results";
@@ -674,6 +729,7 @@ async function main() {
         pricingKey: pricingLookup?.matchedKey ?? null,
         pricing: pricingInfo,
         totalCost,
+        cacheSimulation,
         unitTestTotals,
       },
     };

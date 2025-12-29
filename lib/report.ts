@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import type { TestVerificationResult } from "./output-test-runner.ts";
 import type { ValidationResult } from "./validator-runner.ts";
 import { generateMultiTestHtml } from "./report-template.ts";
+import type { simulateCacheSavings } from "./utils.ts";
 
 interface TextBlock {
   type: "text";
@@ -70,16 +71,19 @@ export interface PricingInfo {
   inputCostPerMTok: number;
   outputCostPerMTok: number;
   cacheReadCostPerMTok?: number;
+  cacheCreationCostPerMTok?: number;
 }
 
+/**
+ * Cost information calculated WITHOUT caching.
+ * This represents the actual cost when running tests without prompt caching.
+ */
 export interface TotalCostInfo {
   inputCost: number;
   outputCost: number;
-  cacheReadCost: number;
   totalCost: number;
   inputTokens: number;
   outputTokens: number;
-  cachedInputTokens: number;
 }
 
 export interface UnitTestTotals {
@@ -98,6 +102,7 @@ interface Metadata {
   pricingKey?: string | null;
   pricing?: PricingInfo | null;
   totalCost?: TotalCostInfo | null;
+  cacheSimulation?: ReturnType<typeof simulateCacheSavings> | null;
   unitTestTotals: UnitTestTotals;
 }
 
