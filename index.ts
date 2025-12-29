@@ -30,6 +30,7 @@ import {
   getModelPricingDisplay,
   formatCost,
   formatMTokCost,
+  formatFullPricingDisplay,
 } from "./lib/pricing.ts";
 import type { LanguageModel } from "ai";
 import {
@@ -93,15 +94,7 @@ async function validateAndConfirmPricing(
     const pricingLines = models.map((modelId) => {
       const lookup = lookups.get(modelId)!;
       const display = getModelPricingDisplay(lookup.pricing);
-      const cacheReadText =
-        display.cacheReadCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
-          : "";
-      const cacheWriteText =
-        display.cacheCreationCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
-          : "";
-      return `${modelId}\n  → ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText}`;
+      return `${modelId}\n  → ${formatFullPricingDisplay(display)}`;
     });
 
     note(pricingLines.join("\n\n"), "💰 Pricing Found");
@@ -133,17 +126,7 @@ async function validateAndConfirmPricing(
       for (const modelId of modelsWithPricing) {
         const lookup = lookups.get(modelId)!;
         const display = getModelPricingDisplay(lookup.pricing);
-        const cacheReadText =
-          display.cacheReadCostPerMTok !== undefined
-            ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
-            : "";
-        const cacheWriteText =
-          display.cacheCreationCostPerMTok !== undefined
-            ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
-            : "";
-        lines.push(
-          `  ✓ ${modelId} (${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText})`,
-        );
+        lines.push(`  ✓ ${modelId} (${formatFullPricingDisplay(display)})`);
       }
     }
 
@@ -399,13 +382,9 @@ async function runSingleTest(
 
     if (!resultWriteContent) {
       console.log("  ⚠️  No ResultWrite output found");
-      const promptContent = messages[0]?.content;
-      const promptStr = typeof promptContent === "string"
-        ? promptContent
-        : JSON.stringify(promptContent);
       return {
         testName: test.name,
-        prompt: promptStr,
+        prompt: "Failed: No ResultWrite output found",
         steps: result.steps as unknown as SingleTestResult["steps"],
         resultWriteContent: null,
         verification: null,
@@ -452,7 +431,7 @@ async function runSingleTest(
     const promptContent = messages[0]?.content;
     const promptStr = typeof promptContent === "string"
       ? promptContent
-      : JSON.stringify(promptContent);
+      : promptContent?.toString() ?? "";
 
     return {
       testName: test.name,
@@ -466,7 +445,7 @@ async function runSingleTest(
     const promptContent = messages[0]?.content;
     const promptStr = typeof promptContent === "string"
       ? promptContent
-      : JSON.stringify(promptContent);
+      : promptContent?.toString() ?? "";
     return {
       testName: test.name,
       prompt: promptStr,
@@ -505,18 +484,8 @@ async function main() {
     const lookup = pricing.lookups.get(modelId);
     if (pricing.enabled && lookup) {
       const display = getModelPricingDisplay(lookup.pricing);
-      const cacheReadText =
-        display.cacheReadCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
-          : "";
-      const cacheWriteText =
-        display.cacheCreationCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
-          : "";
       console.log(`   ${modelId}`);
-      console.log(
-        `      💰 ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText}`,
-      );
+      console.log(`      💰 ${formatFullPricingDisplay(display)}`);
     } else {
       console.log(`   ${modelId}`);
     }
@@ -584,17 +553,7 @@ async function main() {
 
     if (pricingLookup) {
       const display = getModelPricingDisplay(pricingLookup.pricing);
-      const cacheReadText =
-        display.cacheReadCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheReadCostPerMTok)}/MTok cache read`
-          : "";
-      const cacheWriteText =
-        display.cacheCreationCostPerMTok !== undefined
-          ? `, ${formatMTokCost(display.cacheCreationCostPerMTok)}/MTok cache write`
-          : "";
-      console.log(
-        `💰 Pricing: ${formatMTokCost(display.inputCostPerMTok)}/MTok in, ${formatMTokCost(display.outputCostPerMTok)}/MTok out${cacheReadText}${cacheWriteText}`,
-      );
+      console.log(`💰 Pricing: ${formatFullPricingDisplay(display)}`);
     }
 
     const model = gateway.languageModel(modelId);
