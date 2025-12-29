@@ -441,4 +441,4 @@ Run specific test file: `bun test lib/utils.test.ts`
 
 ## Important notes
 
-Always run `bun run tsc` and `bun test` before completing work to make sure the TypeScript types and tests work.
+Always run `bun tsc --noEmit` and `bun test` before completing work to make sure the TypeScript types and tests pass.
