@@ -121,6 +121,7 @@ describe("calculateTotalCost", () => {
     expect(result).toEqual({
       inputCost: 0,
       outputCost: 0,
+      cacheReadCost: 0,
       totalCost: 0,
       inputTokens: 0,
       outputTokens: 0,
@@ -173,21 +174,21 @@ describe("calculateTotalCost", () => {
     // Total Output: 50 + 100 + 150 = 300
     // Total Cached: 10 + 0 + 20 = 30
 
-    // Costs (per Token) - calculateCost bills all input at full rate:
+    // Costs (per Token):
     // Input: 600 * (1.0 / 1e6) = 0.0006
     // Output: 300 * (2.0 / 1e6) = 0.0006
-    // Total: 0.0006 + 0.0006 = 0.0012
+    // Cache read: 30 * (0.1 / 1e6) = 0.000003
+    // Total: 0.0006 + 0.0006 + 0.000003 = 0.001203
 
     const result = calculateTotalCost(tests, pricing);
 
-    expect(result).toEqual({
-      inputCost: 0.0006,
-      outputCost: 0.0006,
-      totalCost: 0.0012,
-      inputTokens: 600,
-      outputTokens: 300,
-      cachedInputTokens: 30,
-    });
+    expect(result.inputCost).toBe(0.0006);
+    expect(result.outputCost).toBe(0.0006);
+    expect(result.cacheReadCost).toBe(0.000003);
+    expect(result.totalCost).toBeCloseTo(0.001203, 6);
+    expect(result.inputTokens).toBe(600);
+    expect(result.outputTokens).toBe(300);
+    expect(result.cachedInputTokens).toBe(30);
   });
 });
 

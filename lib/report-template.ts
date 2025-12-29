@@ -380,7 +380,7 @@ function renderPricingSection(data: MultiTestResultData) {
         <div class="cost-row cached">
           <span class="cost-label">Cached tokens (from usage):</span>
           <span class="cost-tokens">${totalCost.cachedInputTokens.toLocaleString()} ⚡</span>
-          <span class="cost-value">-</span>
+          <span class="cost-value">${formatCost(totalCost.cacheReadCost)}</span>
         </div>
         `
             : ""

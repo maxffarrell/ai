@@ -77,10 +77,16 @@ export function calculateTotalCost(
     totalOutputTokens,
   );
 
+  // Calculate cache read cost
+  const cacheReadCost = pricing.cacheReadInputTokenCost !== undefined
+    ? totalCachedInputTokens * pricing.cacheReadInputTokenCost
+    : 0;
+
   return {
     inputCost: costResult.inputCost,
     outputCost: costResult.outputCost,
-    totalCost: costResult.totalCost,
+    cacheReadCost,
+    totalCost: costResult.totalCost + cacheReadCost,
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
     cachedInputTokens: totalCachedInputTokens,
