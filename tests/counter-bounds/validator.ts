@@ -2,23 +2,17 @@ import type { ValidationResult } from "../../lib/validator-runner.ts";
 
 /**
  * Validates that the counter-bounds component uses proper Svelte 5 patterns:
- * - Must use $state() for count
- * - Must use $derived() for atMin/atMax bounds checking
+ * - Must use $derived() for atMin/atMax/count bounds checking
  * - Must NOT use $effect for bounds checking
  * - Must NOT use legacy export let syntax
  */
 export function validate(code: string): ValidationResult {
   const errors: string[] = [];
 
-  // Check for $state usage
-  if (!code.includes("$state")) {
-    errors.push("Component must use the $state rune for the count value");
-  }
-
   // Check for $derived usage for bounds checking
   if (!code.includes("$derived")) {
     errors.push(
-      "Component must use the $derived rune for atMin/atMax bounds checking",
+      "Component must use the $derived rune for atMin/atMax/count bounds checking",
     );
   }
 

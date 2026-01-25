@@ -2,7 +2,7 @@
 
 <script>
   let { initialValue = 0, min = -Infinity, max = Infinity } = $props();
-  let count = $state(initialValue);
+  let count = $derived(initialValue);
 
   let atMin = $derived(count <= min);
   let atMax = $derived(count >= max);

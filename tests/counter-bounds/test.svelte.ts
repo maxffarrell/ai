@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/svelte";
 import { expect, test, describe } from "vitest";
 import userEvent from "@testing-library/user-event";
 import Counter from "./Component.svelte";
+import { flushSync } from "svelte";
 
 describe("Counter with bounds component", () => {
   test("increment increases count", async () => {
@@ -73,5 +74,20 @@ describe("Counter with bounds component", () => {
 
     expect(incrementButton).not.toBeDisabled();
     expect(decrementButton).not.toBeDisabled();
+  });
+
+  test("works if the initialValue prop changes", async () => {
+    const user = userEvent.setup();
+	let props = $state({ initialValue: 0 });
+    render(Counter, { props });
+
+    const incrementButton = screen.getByTestId("increment-button");
+	await user.click(incrementButton);
+	const countElement = screen.getByTestId("count-value");
+	expect(countElement).toHaveTextContent("1");
+	flushSync(()=>{
+		props.initialValue = 10;
+	})
+	expect(countElement).toHaveTextContent("10");
   });
 });
