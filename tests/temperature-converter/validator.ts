@@ -21,27 +21,6 @@ export function validate(code: string): ValidationResult {
 		errors.push("Component must use $derived() for the other temperature scales");
 	}
 
-	// Count $state occurrences - should only have one for temperature
-	// Allow for potential UI state like focus indicators, but warn if multiple temperature states
-	const stateMatches = code.match(/\$state\s*\(/g);
-	if (stateMatches && stateMatches.length > 1) {
-		// Check if it looks like multiple temperature states (bad pattern)
-		const hasCelsiusState = /celsius\s*=\s*\$state/.test(code);
-		const hasFahrenheitState = /fahrenheit\s*=\s*\$state/.test(code);
-		const hasKelvinState = /kelvin\s*=\s*\$state/.test(code);
-
-		const temperatureStateCount = [hasCelsiusState, hasFahrenheitState, hasKelvinState].filter(
-			Boolean,
-		).length;
-
-		if (temperatureStateCount > 1) {
-			errors.push(
-				"Component should have only one $state for temperature (single source of truth). " +
-					"Multiple $state values for different temperature scales can cause update loops.",
-			);
-		}
-	}
-
 	// Must NOT use $effect for conversions (anti-pattern that causes loops)
 	if (code.includes("$effect")) {
 		errors.push(

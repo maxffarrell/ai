@@ -1,5 +1,5 @@
 <script>
-	let { items, searchFields } = $props();
+	let { items, searchFields, children } = $props();
 	
 	let query = $state('');
 	
@@ -26,5 +26,5 @@
 <p>{result_count} results</p>
 
 {#each filtered_items as item (item[searchFields[0]])}
-	<div>{item[searchFields[0]]}</div>
+	{@render children(item)}
 {/each}

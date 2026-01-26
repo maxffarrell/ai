@@ -1,10 +1,9 @@
 <svelte:options runes={true} />
 
 <script>
-	let { initial = [], maxTags = Infinity, allowDuplicates = false } = $props();
+	let { maxTags = Infinity, allowDuplicates = false } = $props();
 	
-	// Use structuredClone to properly copy the initial data
-	let tags = $state(structuredClone(initial));
+	let tags = $state([]);
 	let input_value = $state("");
 	
 	let can_add_more = $derived(tags.length < maxTags);

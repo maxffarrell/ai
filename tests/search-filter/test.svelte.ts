@@ -2,6 +2,20 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect } from 'vitest';
 import Component from './Component.svelte';
+import { createRawSnippet } from 'svelte';
+
+const children = createRawSnippet<[item: string]>((item)=>{
+	return {
+		render() {
+			return `<div>${item()}</div>`
+		},
+		setup(element) {
+			$effect.pre(()=>{
+				element.textContent = item();
+			})
+		},
+	}
+})
 
 describe('Search Filter', () => {
 	it('filters items based on search query', async () => {
@@ -9,7 +23,7 @@ describe('Search Filter', () => {
 		const items = [{ name: 'Apple' }, { name: 'Banana' }];
 
 		render(Component, {
-			props: { items, searchFields: ['name'] }
+			props: { items, searchFields: ['name'], children }
 		});
 
 		const searchbox = screen.getByRole('searchbox');
@@ -28,7 +42,7 @@ describe('Search Filter', () => {
 		];
 
 		render(Component, {
-			props: { items, searchFields: ['name'] }
+			props: { items, searchFields: ['name'], children }
 		});
 
 		const searchbox = screen.getByRole('searchbox');
@@ -42,7 +56,7 @@ describe('Search Filter', () => {
 		const items = [{ name: 'Apple' }, { name: 'Banana' }];
 
 		render(Component, {
-			props: { items, searchFields: ['name'] }
+			props: { items, searchFields: ['name'], children }
 		});
 
 		const searchbox = screen.getByRole('searchbox');
@@ -60,7 +74,7 @@ describe('Search Filter', () => {
 		];
 
 		render(Component, {
-			props: { items, searchFields: ['name', 'description'] }
+			props: { items, searchFields: ['name', 'description'], children }
 		});
 
 		const searchbox = screen.getByRole('searchbox');
@@ -78,7 +92,7 @@ describe('Search Filter', () => {
 		];
 
 		render(Component, {
-			props: { items, searchFields: ['name'] }
+			props: { items, searchFields: ['name'], children }
 		});
 
 		expect(screen.getByText('Apple')).toBeInTheDocument();
@@ -92,7 +106,7 @@ describe('Search Filter', () => {
 		const items = [{ name: 'Apple' }, { name: 'Banana' }];
 
 		render(Component, {
-			props: { items, searchFields: ['name'] }
+			props: { items, searchFields: ['name'], children }
 		});
 
 		const searchbox = screen.getByRole('searchbox');

@@ -44,19 +44,19 @@
 	</div>
 
 	<ul class="criteria-list" data-testid="criteria-list">
-		<li class:met={has_length} data-testid="criteria-length">
+		<li class={{ met: has_length }} data-testid="criteria-length">
 			At least 8 characters
 		</li>
-		<li class:met={has_uppercase} data-testid="criteria-uppercase">
+		<li class={{ met: has_uppercase }} data-testid="criteria-uppercase">
 			Contains uppercase letter
 		</li>
-		<li class:met={has_lowercase} data-testid="criteria-lowercase">
+		<li class={{ met: has_lowercase }} data-testid="criteria-lowercase">
 			Contains lowercase letter
 		</li>
-		<li class:met={has_number} data-testid="criteria-number">
+		<li class={{ met: has_number }} data-testid="criteria-number">
 			Contains number
 		</li>
-		<li class:met={has_special} data-testid="criteria-special">
+		<li class={{ met: has_special }} data-testid="criteria-special">
 			Contains special character
 		</li>
 	</ul>

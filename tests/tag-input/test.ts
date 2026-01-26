@@ -31,13 +31,12 @@ describe("TagInput component", () => {
 		expect(screen.getByTestId("tag-text")).toHaveTextContent("tag1");
 	});
 
-	test("X removes tag - render with initial tag, click X button, verify tag gone", async () => {
+	test("X removes tag - click X button, verify tag gone", async () => {
 		const user = userEvent.setup();
-		render(TagInput, {
-			props: {
-				initial: ["tag1"],
-			},
-		});
+		render(TagInput);
+
+		const input = screen.getByTestId("tag-input");
+		await user.type(input, "tag1{Enter}");
 
 		// Verify tag exists
 		expect(screen.getByTestId("tag")).toBeInTheDocument();
@@ -53,18 +52,16 @@ describe("TagInput component", () => {
 
 	test("Backspace removes last tag - render with tags, focus empty input, press Backspace, verify last tag removed", async () => {
 		const user = userEvent.setup();
-		render(TagInput, {
-			props: {
-				initial: ["tag1", "tag2"],
-			},
-		});
+		render(TagInput);
+
+		const input = screen.getByTestId("tag-input");
+		await user.type(input, "tag1{Enter}tag2{Enter}");
+
 
 		// Verify both tags exist
 		let tags = screen.getAllByTestId("tag");
 		expect(tags.length).toBe(2);
 
-		// Focus input and press backspace (input is empty)
-		const input = screen.getByTestId("tag-input");
 		await user.click(input);
 		await user.keyboard("{Backspace}");
 
@@ -74,21 +71,23 @@ describe("TagInput component", () => {
 		expect(screen.getByTestId("tag-text")).toHaveTextContent("tag1");
 	});
 
-	test("Respects maxTags - render with maxTags=2 and initial=['a','b'], try adding 'c', verify not added", async () => {
+	test("Respects maxTags - render with maxTags=2, try adding 'c', verify not added", async () => {
 		const user = userEvent.setup();
 		render(TagInput, {
 			props: {
-				initial: ["a", "b"],
 				maxTags: 2,
 			},
 		});
+
+		const input = screen.getByTestId("tag-input");
+		await user.type(input, "a{Enter}b{Enter}");
+
 
 		// Verify initial tags
 		let tags = screen.getAllByTestId("tag");
 		expect(tags.length).toBe(2);
 
 		// Input should be disabled when at max
-		const input = screen.getByTestId("tag-input");
 		expect(input).toBeDisabled();
 
 		// Even if we try to type, nothing should happen
@@ -102,20 +101,19 @@ describe("TagInput component", () => {
 		expect(tags.length).toBe(2);
 	});
 
-	test("Duplicates blocked by default - render with initial=['tag1'], try adding 'tag1' again, verify not added", async () => {
+	test("Duplicates blocked by default - try adding 'tag1' again, verify not added", async () => {
 		const user = userEvent.setup();
-		render(TagInput, {
-			props: {
-				initial: ["tag1"],
-			},
-		});
+		render(TagInput);
+
+		const input = screen.getByTestId("tag-input");
+		await user.type(input, "tag1{Enter}");
+
 
 		// Verify initial tag
 		let tags = screen.getAllByTestId("tag");
 		expect(tags.length).toBe(1);
 
 		// Try to add duplicate
-		const input = screen.getByTestId("tag-input");
 		await user.type(input, "tag1{Enter}");
 
 		// Verify still only 1 tag

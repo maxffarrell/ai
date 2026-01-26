@@ -16,6 +16,11 @@ export function validate(code: string): ValidationResult {
 		errors.push("Component must use $derived() for filtered items and result count");
 	}
 
+	// Must use $derived() for filtered items and count
+	if (!code.includes("@render")) {
+		errors.push("Component must use @render for rendering children");
+	}
+
 	// Must NOT use $effect for filtering
 	if (code.includes("$effect")) {
 		errors.push("Component must NOT use $effect for filtering - use $derived instead");
