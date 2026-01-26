@@ -9,6 +9,10 @@ async function setupInitialTodos(todos: { id: number; text: string; done: boolea
 		for (const todo of todos) {
 			await user.type(input, todo.text);
 			await user.click(addButton);
+			if(todo.done) {
+				const checkbox = screen.getAllByTestId("todo-checkbox").at(-1);
+				await user.click(checkbox!);
+			}
 		}
 }
 
@@ -70,6 +74,7 @@ describe("TodoList component", () => {
 	});
 
 	test("shows remaining count - render with 2 todos (1 done, 1 not), verify shows correct count", async () => {
+		const user = userEvent.setup();
 		render(TodoList);
 
 		await setupInitialTodos(
@@ -77,7 +82,7 @@ describe("TodoList component", () => {
 				{ id: 1, text: "Done todo", done: true },
 				{ id: 2, text: "Pending todo", done: false },
 			],
-			userEvent.setup()
+			user
 		);
 
 		const countElement = screen.getByTestId("remaining-count");
