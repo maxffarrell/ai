@@ -1,9 +1,9 @@
 ---
 name: scenario-writer
-description: Picks a new scenario to create from the list, delegates the writing of it to the ai-scenario-writer subagent and verify the correctness.
+description: Picks a new scenario to create based on the description of the user, delegates the writing of it to the ai-scenario-writer subagent and verify the correctness.
 ---
 
-Read [this file](references/scenario.md), pick the scenario that has not been implemented yet and that you think it could be more valuable. Then invoke the `ai-scenario-writer` subagent to actually write the test in a separate context. When it finishes please validate its work and launch a new subagent with a new task (or to correct the work of the last one). Once a test is completed update the file to check the complete ones.
+Implement the scenario proposed by the user if that has not been implemented yet. Then invoke the `ai-scenario-writer` subagent to actually write the test in a separate context. When it finishes please validate its work and launch a new subagent with a new task if the user proposed multiple scenarios (or to correct the work of the last one).
 
 ## Test Structure
 
