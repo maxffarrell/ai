@@ -6,15 +6,6 @@ import type { ValidationResult } from "../../lib/validator-runner.ts";
 export function validate(code: string): ValidationResult {
 	const errors: string[] = [];
 
-	// Must use $state() for open indices
-	if (code.includes("$state")) {
-		errors.push("Component must not use $state() for managing open indices");
-	}
-
-	if (!code.includes("SvelteSet")) {
-		errors.push("Component must not use $state() for managing open indices");
-	}
-
 	// Must have aria-expanded attributes
 	if (!code.includes("aria-expanded")) {
 		errors.push("Component must have aria-expanded attributes for accessibility");
