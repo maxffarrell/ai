@@ -11,6 +11,9 @@ bun install
 # Run the main benchmark (interactive CLI)
 bun run start
 
+# Launch the terminal dashboard
+bun run tui
+
 # Verify reference implementations against test suites
 bun run verify-tests
 

@@ -33,6 +33,20 @@ To run the benchmark:
 bun run index.ts
 ```
 
+### Terminal UI
+
+Launch the terminal dashboard with:
+
+```bash
+bun run tui
+```
+
+The TUI provides entry points for the existing benchmark, reference-test
+verification, and report generation commands. Selecting **Run benchmark**
+delegates directly to `index.ts`, so model selection, MCP configuration,
+agent execution, verification, pricing, and report generation behave exactly
+as they do from the command line.
+
 ### Interactive CLI
 
 The benchmark features an interactive CLI that will prompt you for configuration:
