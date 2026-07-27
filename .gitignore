@@ -45,3 +45,5 @@ results/*
 
 # AI benchmark settings (auto-generated)
 .ai-settings.json
+.ai-checkpoint.json
+.ai-checkpoint.json.tmp

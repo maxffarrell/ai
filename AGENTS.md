@@ -336,6 +336,11 @@ The project uses `@ai-sdk/mcp` with a custom patch applied via `patch-package`:
 
 ### Output Files
 
+Benchmark progress is saved to `.ai-checkpoint.json` after each completed test.
+If a run is interrupted, rerun it with the same configuration to resume. The
+checkpoint is removed after the run completes or when a different configuration
+is selected.
+
 All results are saved in the `results/` directory with timestamped filenames:
 
 - **JSON files**: `result-2024-12-07-14-30-45.json` - Complete execution trace

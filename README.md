@@ -95,6 +95,14 @@ The HTML report includes:
 - MCP status badge
 - Dark/light theme toggle
 
+### Checkpoints and resume
+
+Benchmark progress is checkpointed after each completed test in the local
+`.ai-checkpoint.json` file. If the process is interrupted, rerun the benchmark
+with the same models, MCP configuration, testing-tool setting, and test suite
+to resume from the last saved test. A completed run removes the checkpoint;
+starting with a different configuration discards the stale checkpoint.
+
 To regenerate an HTML report from a JSON file:
 
 ```bash

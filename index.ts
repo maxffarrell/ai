@@ -43,6 +43,13 @@ import {
   note,
 } from "@clack/prompts";
 import { gateway } from "ai";
+import {
+  checkpointMatches,
+  clearCheckpoint,
+  createCheckpoint,
+  loadCheckpoint,
+  saveCheckpoint,
+} from "./lib/checkpoint.ts";
 
 const SETTINGS_FILE = ".ai-settings.json";
 
@@ -535,6 +542,42 @@ async function main() {
     process.exit(1);
   }
 
+  const checkpointConfig = {
+    models,
+    mcp,
+    testingTool,
+    pricingEnabled: pricing.enabled,
+    testNames: tests.map((test) => test.name),
+  };
+  let checkpoint = loadCheckpoint();
+  let completedResults: Record<string, SingleTestResult[]> = {};
+
+  if (checkpoint && checkpointMatches(checkpoint, checkpointConfig)) {
+    const resume = await confirm({
+      message: `Resume checkpoint from ${new Date(checkpoint.createdAt).toLocaleString()}?`,
+      initialValue: true,
+    });
+
+    if (isCancel(resume)) {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    if (resume) {
+      completedResults = checkpoint.completedResults;
+      note(
+        `${Object.values(completedResults).reduce((total, results) => total + results.length, 0)} completed test(s) will be skipped.`,
+        "Resuming checkpoint",
+      );
+    } else {
+      clearCheckpoint();
+      checkpoint = null;
+    }
+  } else if (checkpoint) {
+    clearCheckpoint();
+    checkpoint = null;
+  }
+
   setupOutputsDirectory();
 
   let mcpClient = null;
@@ -575,12 +618,18 @@ async function main() {
 
     const model = gateway.languageModel(modelId);
 
-    const testResults: SingleTestResult[] = [];
+    const testResults: SingleTestResult[] = [
+      ...(completedResults[modelId] ?? []),
+    ];
+    const completedTestNames = new Set(
+      testResults.map((result) => result.testName),
+    );
     const startTime = Date.now();
 
     for (let i = 0; i < tests.length; i++) {
       const test = tests[i];
       if (!test) continue;
+      if (completedTestNames.has(test.name)) continue;
       const result = await runSingleTest(
         test,
         model,
@@ -590,6 +639,9 @@ async function main() {
         tests.length,
       );
       testResults.push(result);
+      completedResults[modelId] = testResults;
+      checkpoint = createCheckpoint(checkpointConfig, completedResults);
+      saveCheckpoint(checkpoint);
     }
 
     const totalDuration = Date.now() - startTime;
@@ -738,6 +790,7 @@ async function main() {
     await generateReport(jsonPath, htmlPath);
   }
 
+  clearCheckpoint();
   cleanupOutputsDirectory();
 
   process.exit(totalFailed > 0 ? 1 : 0);
