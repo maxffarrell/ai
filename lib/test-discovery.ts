@@ -9,11 +9,12 @@ export interface TestDefinition {
   testFile: string;
   promptFile: string;
   prompt: string;
+  testContent: string;
 }
 
-export function discoverTests() {
+export function discoverTests(): TestDefinition[] {
   const testsDir = join(process.cwd(), "tests");
-  const definitions = [];
+  const definitions: TestDefinition[] = [];
 
   try {
     const entries = readdirSync(testsDir);
@@ -24,7 +25,10 @@ export function discoverTests() {
 
       if (stat.isDirectory()) {
         const referenceFile = join(entryPath, "Reference.svelte");
-        const testFile = join(entryPath, "test.ts");
+        let testFile = join(entryPath, "test.ts");
+        if (!existsSync(testFile)) {
+          testFile = join(entryPath, "test.svelte.ts");
+        }
         const promptFile = join(entryPath, "prompt.md");
         const componentFile = join(entryPath, "Component.svelte");
 
@@ -34,6 +38,7 @@ export function discoverTests() {
           existsSync(promptFile)
         ) {
           const prompt = readFileSync(promptFile, "utf-8");
+          const testContent = readFileSync(testFile, "utf-8");
 
           definitions.push({
             name: entry,
@@ -43,6 +48,7 @@ export function discoverTests() {
             testFile,
             promptFile,
             prompt,
+            testContent,
           });
         } else {
           const missing = [];
@@ -60,10 +66,4 @@ export function discoverTests() {
   definitions.sort((a, b) => a.name.localeCompare(b.name));
 
   return definitions;
-}
-
-export function buildAgentPrompt(test: TestDefinition) {
-  return `${test.prompt}
-
-IMPORTANT: When you have finished implementing the component, use the ResultWrite tool to output your final Svelte component code. Only output the component code itself, no explanations or markdown formatting.`;
 }
